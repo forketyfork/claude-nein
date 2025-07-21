@@ -30,6 +30,7 @@ This is a macOS menu bar application that monitors Claude Code spending in real-
 - Implement proper memory management
 - Use dependency injection for testability
 - Write unit tests for core business logic
+- **ALWAYS update PLAN.md to check off completed steps after implementing features**
 
 ## Architecture Patterns
 - Use MVVM pattern with SwiftUI
