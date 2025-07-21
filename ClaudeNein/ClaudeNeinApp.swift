@@ -19,6 +19,15 @@ struct ClaudeNeinApp: App {
     }
 }
 
+// MARK: - Test Helper
+#if DEBUG
+extension ClaudeNeinApp {
+    static func createForTesting() -> ClaudeNeinApp {
+        return ClaudeNeinApp()
+    }
+}
+#endif
+
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
     

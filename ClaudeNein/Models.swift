@@ -22,6 +22,17 @@ struct UsageEntry: Codable, Equatable {
         case projectPath = "project_path"
     }
     
+    // Regular memberwise initializer for testing and direct creation
+    init(id: String, timestamp: Date, model: String, tokenCounts: TokenCounts, cost: Double? = nil, sessionId: String? = nil, projectPath: String? = nil) {
+        self.id = id
+        self.timestamp = timestamp
+        self.model = model
+        self.tokenCounts = tokenCounts
+        self.cost = cost
+        self.sessionId = sessionId
+        self.projectPath = projectPath
+    }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
