@@ -1,0 +1,208 @@
+# Claude Code Spend Monitor - macOS Menu Bar App Implementation Plan
+
+## Project Overview
+Build a macOS menu bar application that displays real-time Claude Code spending with a simple menu bar icon showing today's spend and a dropdown with detailed breakdowns for today/week/month periods.
+
+## Technical Architecture
+- **Framework**: Swift + SwiftUI for native macOS experience
+- **Menu Bar**: NSStatusItem with custom icon and menu
+- **Data Source**: Monitor Claude Code JSONL files in config directories
+- **Real-time Updates**: File system monitoring + periodic refresh
+- **Cost Calculation**: Implement pricing logic with LiteLLM API integration
+
+## Implementation Steps
+
+### Phase 1: Project Setup & Foundation
+- [ ] Create new macOS app project in Xcode
+- [ ] Configure Info.plist for menu bar app (LSUIElement = true)
+- [ ] Set up basic SwiftUI app structure with MenuBarApp lifecycle
+- [ ] Create app icon and menu bar icon assets
+- [ ] Set up project structure with organized folders
+
+### Phase 2: Data Models & Core Logic
+- [ ] Create Swift data models for Claude Code usage data:
+  - [ ] `UsageEntry` struct for individual JSONL entries
+  - [ ] `TokenCounts` struct for aggregated usage
+  - [ ] `SessionBlock` struct for 5-hour billing periods
+  - [ ] `SpendSummary` struct for UI display data
+- [ ] Implement JSONL file parsing:
+  - [ ] Create `JSONLParser` class to read and parse JSONL files
+  - [ ] Handle malformed JSON lines gracefully
+  - [ ] Implement timestamp parsing and validation
+- [ ] Implement Claude config file discovery:
+  - [ ] Find Claude config directories (`~/.claude/projects/`, `~/.config/claude/projects/`)
+  - [ ] Implement recursive JSONL file discovery
+  - [ ] Support custom config directory via environment variable
+
+### Phase 3: Cost Calculation Engine
+- [ ] Create `PricingManager` class:
+  - [ ] Fetch LiteLLM pricing data from API
+  - [ ] Implement offline fallback with bundled pricing data
+  - [ ] Cache pricing data locally with expiration
+- [ ] Implement cost calculation logic:
+  - [ ] Calculate costs from token counts using model pricing
+  - [ ] Handle different token types (input, output, cache)
+  - [ ] Support pre-calculated costs from JSONL when available
+- [ ] Create spend aggregation functions:
+  - [ ] Daily spend calculation
+  - [ ] Weekly spend calculation (last 7 days)
+  - [ ] Monthly spend calculation (current calendar month)
+
+### Phase 4: File Monitoring System
+- [ ] Implement `FileMonitor` class using FSEvents:
+  - [ ] Monitor Claude config directories for file changes
+  - [ ] Track file modification timestamps
+  - [ ] Debounce rapid file changes
+- [ ] Create incremental data loading:
+  - [ ] Only parse new/modified files since last check
+  - [ ] Maintain cache of processed entries
+  - [ ] Implement duplicate entry detection and filtering
+- [ ] Add periodic refresh mechanism:
+  - [ ] Timer-based refresh every 10-30 seconds
+  - [ ] Immediate refresh on file system events
+  - [ ] Background processing to avoid UI blocking
+
+### Phase 5: Menu Bar Interface
+- [ ] Create `MenuBarManager` class:
+  - [ ] Initialize NSStatusItem with custom icon
+  - [ ] Handle menu bar icon clicks
+  - [ ] Manage menu show/hide behavior
+- [ ] Design menu bar icon:
+  - [ ] Create icon showing today's spend amount
+  - [ ] Use appropriate font size and styling
+  - [ ] Handle long spend amounts gracefully
+  - [ ] Support dark/light mode theming
+- [ ] Implement icon update logic:
+  - [ ] Update icon text when spend changes
+  - [ ] Animate icon changes smoothly
+  - [ ] Handle edge cases (no data, errors)
+
+### Phase 6: Dropdown Menu UI
+- [ ] Create SwiftUI views for menu content:
+  - [ ] `SpendSummaryView` - main menu content
+  - [ ] `PeriodSpendRow` - individual period display
+  - [ ] `ModelBreakdownView` - spending by model
+- [ ] Implement menu layout:
+  - [ ] Today's spend (prominent display)
+  - [ ] This week's spend
+  - [ ] This month's spend
+  - [ ] Separator and additional options
+- [ ] Add interactive elements:
+  - [ ] "Refresh" menu item for manual updates
+  - [ ] "Open Claude Directory" menu item
+  - [ ] "Quit" menu item
+- [ ] Style menu for native macOS look:
+  - [ ] Use system fonts and colors
+  - [ ] Proper spacing and alignment
+  - [ ] Support dark/light mode
+
+### Phase 7: Settings & Preferences
+- [ ] Create preferences window (optional):
+  - [ ] Custom Claude config directory path
+  - [ ] Refresh interval settings
+  - [ ] Cost display format preferences
+- [ ] Implement UserDefaults storage:
+  - [ ] Save user preferences
+  - [ ] Handle preference changes
+  - [ ] Provide sensible defaults
+- [ ] Add keyboard shortcuts:
+  - [ ] Global hotkey to toggle menu (optional)
+  - [ ] Standard menu shortcuts
+
+### Phase 8: Error Handling & Edge Cases
+- [ ] Implement comprehensive error handling:
+  - [ ] Handle missing Claude config directories
+  - [ ] Deal with corrupted JSONL files
+  - [ ] Network errors when fetching pricing data
+  - [ ] File permission issues
+- [ ] Add user feedback mechanisms:
+  - [ ] Show error states in menu bar icon
+  - [ ] Display helpful error messages in dropdown
+  - [ ] Log errors for debugging
+- [ ] Handle edge cases:
+  - [ ] No usage data available
+  - [ ] Clock changes (daylight saving, etc.)
+  - [ ] App launch during active Claude session
+
+### Phase 9: Performance Optimization
+- [ ] Profile and optimize data loading:
+  - [ ] Lazy loading of historical data
+  - [ ] Efficient memory usage for large datasets
+  - [ ] Background processing for heavy operations
+- [ ] Optimize UI updates:
+  - [ ] Debounce rapid data changes
+  - [ ] Smart UI refresh (only when data actually changes)
+  - [ ] Minimize menu bar icon redraws
+- [ ] Add data caching:
+  - [ ] Cache processed usage data
+  - [ ] Persist cache between app launches
+  - [ ] Intelligent cache invalidation
+
+### Phase 10: Testing & Polishing
+- [ ] Write unit tests:
+  - [ ] Test JSONL parsing logic
+  - [ ] Test cost calculation accuracy
+  - [ ] Test file monitoring functionality
+- [ ] Create mock data for testing:
+  - [ ] Sample JSONL files with various scenarios
+  - [ ] Test data with different models and time periods
+- [ ] Perform integration testing:
+  - [ ] Test with real Claude Code usage data
+  - [ ] Verify cost calculation accuracy
+  - [ ] Test app behavior during active Claude sessions
+- [ ] Polish user experience:
+  - [ ] Smooth animations and transitions
+  - [ ] Intuitive menu interactions
+  - [ ] Proper accessibility support
+
+### Phase 11: Build & Distribution
+- [ ] Configure build settings:
+  - [ ] Code signing and notarization
+  - [ ] Minimum macOS version support
+  - [ ] Universal binary (Intel + Apple Silicon)
+- [ ] Create build scripts:
+  - [ ] Archive and export workflow
+  - [ ] Automated testing in CI
+- [ ] Prepare for distribution:
+  - [ ] App store preparation (if applicable)
+  - [ ] Direct distribution DMG creation
+  - [ ] Documentation and README
+
+## Technical Considerations
+
+### File Monitoring Strategy
+- Use FSEvents API for efficient file system monitoring
+- Implement smart debouncing to handle rapid file changes
+- Consider battery impact and optimize monitoring frequency
+
+### Data Processing Efficiency
+- Process only changed files to minimize CPU usage
+- Implement smart caching with proper invalidation
+- Use background queues for heavy data processing
+
+### UI Responsiveness
+- Never block the main thread with data processing
+- Use SwiftUI's reactive updates for smooth UI changes
+- Implement proper loading states and error messaging
+
+### Memory Management
+- Avoid keeping all historical data in memory
+- Implement sliding window for recent usage data
+- Proper cleanup of file monitors and timers
+
+## Success Criteria
+- [ ] App launches and appears in menu bar
+- [ ] Displays accurate today's spend in menu bar icon
+- [ ] Dropdown shows correct breakdowns for today/week/month
+- [ ] Updates in real-time as Claude Code is used
+- [ ] Handles edge cases gracefully without crashing
+- [ ] Minimal performance impact on system
+- [ ] Native macOS look and feel
+
+## Optional Enhancements (Future)
+- [ ] Notifications for spending thresholds
+- [ ] Historical spending graphs and trends
+- [ ] Export spending data to CSV/JSON
+- [ ] Integration with expense tracking apps
+- [ ] Customizable spending alerts and limits
+- [ ] Support for multiple Claude Code profiles
