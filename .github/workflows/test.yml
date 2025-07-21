@@ -1,5 +1,8 @@
 name: Test
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ main ]
@@ -11,6 +14,12 @@ jobs:
     runs-on: macos-latest
     
     steps:
+
+    - name: Import Code-Signing Certificates
+      uses: Apple-Actions/import-codesign-certs@v1
+      with:
+        p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
+        p12-password: ${{ secrets.MACOS_CERTIFICATE_PWD }}
     - uses: actions/checkout@v4
     
     - name: Select Xcode version
