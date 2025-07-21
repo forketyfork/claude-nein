@@ -1,0 +1,556 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		1044BE5A2E2E6A9200CF5877 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1044BE432E2E6A9100CF5877 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1044BE4A2E2E6A9100CF5877;
+			remoteInfo = ClaudeNein;
+		};
+		1044BE642E2E6A9200CF5877 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1044BE432E2E6A9100CF5877 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1044BE4A2E2E6A9100CF5877;
+			remoteInfo = ClaudeNein;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1044BE4B2E2E6A9100CF5877 /* ClaudeNein.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeNein.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1044BE592E2E6A9200CF5877 /* ClaudeNeinTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeNeinTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1044BE632E2E6A9200CF5877 /* ClaudeNeinUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeNeinUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		1044BE4D2E2E6A9100CF5877 /* ClaudeNein */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ClaudeNein;
+			sourceTree = "<group>";
+		};
+		1044BE5C2E2E6A9200CF5877 /* ClaudeNeinTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ClaudeNeinTests;
+			sourceTree = "<group>";
+		};
+		1044BE662E2E6A9200CF5877 /* ClaudeNeinUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ClaudeNeinUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1044BE482E2E6A9100CF5877 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1044BE562E2E6A9200CF5877 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1044BE602E2E6A9200CF5877 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1044BE422E2E6A9100CF5877 = {
+			isa = PBXGroup;
+			children = (
+				1044BE4D2E2E6A9100CF5877 /* ClaudeNein */,
+				1044BE5C2E2E6A9200CF5877 /* ClaudeNeinTests */,
+				1044BE662E2E6A9200CF5877 /* ClaudeNeinUITests */,
+				1044BE4C2E2E6A9100CF5877 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1044BE4C2E2E6A9100CF5877 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1044BE4B2E2E6A9100CF5877 /* ClaudeNein.app */,
+				1044BE592E2E6A9200CF5877 /* ClaudeNeinTests.xctest */,
+				1044BE632E2E6A9200CF5877 /* ClaudeNeinUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1044BE4A2E2E6A9100CF5877 /* ClaudeNein */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1044BE6D2E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNein" */;
+			buildPhases = (
+				1044BE472E2E6A9100CF5877 /* Sources */,
+				1044BE482E2E6A9100CF5877 /* Frameworks */,
+				1044BE492E2E6A9100CF5877 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1044BE4D2E2E6A9100CF5877 /* ClaudeNein */,
+			);
+			name = ClaudeNein;
+			packageProductDependencies = (
+			);
+			productName = ClaudeNein;
+			productReference = 1044BE4B2E2E6A9100CF5877 /* ClaudeNein.app */;
+			productType = "com.apple.product-type.application";
+		};
+		1044BE582E2E6A9200CF5877 /* ClaudeNeinTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1044BE702E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNeinTests" */;
+			buildPhases = (
+				1044BE552E2E6A9200CF5877 /* Sources */,
+				1044BE562E2E6A9200CF5877 /* Frameworks */,
+				1044BE572E2E6A9200CF5877 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1044BE5B2E2E6A9200CF5877 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				1044BE5C2E2E6A9200CF5877 /* ClaudeNeinTests */,
+			);
+			name = ClaudeNeinTests;
+			packageProductDependencies = (
+			);
+			productName = ClaudeNeinTests;
+			productReference = 1044BE592E2E6A9200CF5877 /* ClaudeNeinTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		1044BE622E2E6A9200CF5877 /* ClaudeNeinUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1044BE732E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNeinUITests" */;
+			buildPhases = (
+				1044BE5F2E2E6A9200CF5877 /* Sources */,
+				1044BE602E2E6A9200CF5877 /* Frameworks */,
+				1044BE612E2E6A9200CF5877 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1044BE652E2E6A9200CF5877 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				1044BE662E2E6A9200CF5877 /* ClaudeNeinUITests */,
+			);
+			name = ClaudeNeinUITests;
+			packageProductDependencies = (
+			);
+			productName = ClaudeNeinUITests;
+			productReference = 1044BE632E2E6A9200CF5877 /* ClaudeNeinUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1044BE432E2E6A9100CF5877 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					1044BE4A2E2E6A9100CF5877 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					1044BE582E2E6A9200CF5877 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 1044BE4A2E2E6A9100CF5877;
+					};
+					1044BE622E2E6A9200CF5877 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 1044BE4A2E2E6A9100CF5877;
+					};
+				};
+			};
+			buildConfigurationList = 1044BE462E2E6A9100CF5877 /* Build configuration list for PBXProject "ClaudeNein" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1044BE422E2E6A9100CF5877;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 1044BE4C2E2E6A9100CF5877 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1044BE4A2E2E6A9100CF5877 /* ClaudeNein */,
+				1044BE582E2E6A9200CF5877 /* ClaudeNeinTests */,
+				1044BE622E2E6A9200CF5877 /* ClaudeNeinUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1044BE492E2E6A9100CF5877 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1044BE572E2E6A9200CF5877 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1044BE612E2E6A9200CF5877 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1044BE472E2E6A9100CF5877 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1044BE552E2E6A9200CF5877 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1044BE5F2E2E6A9200CF5877 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1044BE5B2E2E6A9200CF5877 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1044BE4A2E2E6A9100CF5877 /* ClaudeNein */;
+			targetProxy = 1044BE5A2E2E6A9200CF5877 /* PBXContainerItemProxy */;
+		};
+		1044BE652E2E6A9200CF5877 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1044BE4A2E2E6A9100CF5877 /* ClaudeNein */;
+			targetProxy = 1044BE642E2E6A9200CF5877 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1044BE6B2E2E6A9200CF5877 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		1044BE6C2E2E6A9200CF5877 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		1044BE6E2E2E6A9200CF5877 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ClaudeNein/ClaudeNein.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNein;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1044BE6F2E2E6A9200CF5877 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ClaudeNein/ClaudeNein.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNein;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1044BE712E2E6A9200CF5877 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNeinTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClaudeNein.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ClaudeNein";
+			};
+			name = Debug;
+		};
+		1044BE722E2E6A9200CF5877 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNeinTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClaudeNein.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ClaudeNein";
+			};
+			name = Release;
+		};
+		1044BE742E2E6A9200CF5877 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNeinUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = ClaudeNein;
+			};
+			name = Debug;
+		};
+		1044BE752E2E6A9200CF5877 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSCHQJ3CR8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNeinUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = ClaudeNein;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1044BE462E2E6A9100CF5877 /* Build configuration list for PBXProject "ClaudeNein" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1044BE6B2E2E6A9200CF5877 /* Debug */,
+				1044BE6C2E2E6A9200CF5877 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1044BE6D2E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNein" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1044BE6E2E2E6A9200CF5877 /* Debug */,
+				1044BE6F2E2E6A9200CF5877 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1044BE702E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNeinTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1044BE712E2E6A9200CF5877 /* Debug */,
+				1044BE722E2E6A9200CF5877 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1044BE732E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNeinUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1044BE742E2E6A9200CF5877 /* Debug */,
+				1044BE752E2E6A9200CF5877 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1044BE432E2E6A9100CF5877 /* Project object */;
+}

@@ -13,7 +13,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 ## Implementation Steps
 
 ### Phase 1: Project Setup & Foundation
-- [ ] Create new macOS app project in Xcode
+- [x] Create new macOS app project in Xcode
 - [ ] Configure Info.plist for menu bar app (LSUIElement = true)
 - [ ] Set up basic SwiftUI app structure with MenuBarApp lifecycle
 - [ ] Create app icon and menu bar icon assets
