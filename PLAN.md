@@ -35,18 +35,18 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Support custom config directory via environment variable
 
 ### Phase 3: Cost Calculation Engine
-- [ ] Create `PricingManager` class:
-  - [ ] Fetch LiteLLM pricing data from API
-  - [ ] Implement offline fallback with bundled pricing data
-  - [ ] Cache pricing data locally with expiration
-- [ ] Implement cost calculation logic:
-  - [ ] Calculate costs from token counts using model pricing
-  - [ ] Handle different token types (input, output, cache)
-  - [ ] Support pre-calculated costs from JSONL when available
-- [ ] Create spend aggregation functions:
-  - [ ] Daily spend calculation
-  - [ ] Weekly spend calculation (last 7 days)
-  - [ ] Monthly spend calculation (current calendar month)
+- [x] Create `PricingManager` class:
+  - [x] Fetch LiteLLM pricing data from API
+  - [x] Implement offline fallback with bundled pricing data
+  - [x] Cache pricing data locally with expiration
+- [x] Implement cost calculation logic:
+  - [x] Calculate costs from token counts using model pricing
+  - [x] Handle different token types (input, output, cache)
+  - [x] Support pre-calculated costs from JSONL when available
+- [x] Create spend aggregation functions:
+  - [x] Daily spend calculation
+  - [x] Weekly spend calculation (last 7 days)
+  - [x] Monthly spend calculation (current calendar month)
 
 ### Phase 4: File Monitoring System
 - [ ] Implement `FileMonitor` class using FSEvents:
