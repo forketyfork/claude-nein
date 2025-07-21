@@ -20,19 +20,19 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [ ] Set up project structure with organized folders
 
 ### Phase 2: Data Models & Core Logic
-- [ ] Create Swift data models for Claude Code usage data:
-  - [ ] `UsageEntry` struct for individual JSONL entries
-  - [ ] `TokenCounts` struct for aggregated usage
-  - [ ] `SessionBlock` struct for 5-hour billing periods
-  - [ ] `SpendSummary` struct for UI display data
-- [ ] Implement JSONL file parsing:
-  - [ ] Create `JSONLParser` class to read and parse JSONL files
-  - [ ] Handle malformed JSON lines gracefully
-  - [ ] Implement timestamp parsing and validation
-- [ ] Implement Claude config file discovery:
-  - [ ] Find Claude config directories (`~/.claude/projects/`, `~/.config/claude/projects/`)
-  - [ ] Implement recursive JSONL file discovery
-  - [ ] Support custom config directory via environment variable
+- [x] Create Swift data models for Claude Code usage data:
+  - [x] `UsageEntry` struct for individual JSONL entries
+  - [x] `TokenCounts` struct for aggregated usage
+  - [x] `SessionBlock` struct for 5-hour billing periods
+  - [x] `SpendSummary` struct for UI display data
+- [x] Implement JSONL file parsing:
+  - [x] Create `JSONLParser` class to read and parse JSONL files
+  - [x] Handle malformed JSON lines gracefully
+  - [x] Implement timestamp parsing and validation
+- [x] Implement Claude config file discovery:
+  - [x] Find Claude config directories (`~/.claude/projects/`, `~/.config/claude/projects/`)
+  - [x] Implement recursive JSONL file discovery
+  - [x] Support custom config directory via environment variable
 
 ### Phase 3: Cost Calculation Engine
 - [ ] Create `PricingManager` class:
