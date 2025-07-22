@@ -173,6 +173,14 @@ class FileMonitor: ObservableObject {
         }
     }
     
+    /// Get cached entries asynchronously to avoid blocking the main thread
+    func getCachedEntriesAsync(completion: @escaping ([UsageEntry]) -> Void) {
+        monitorQueue.async {
+            let entries = Array(self.processedEntries.values)
+            completion(entries)
+        }
+    }
+    
     /// Get entries that have been modified since the last check
     func getModifiedEntries(since date: Date) -> [UsageEntry] {
         return monitorQueue.sync {

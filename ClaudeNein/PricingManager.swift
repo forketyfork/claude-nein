@@ -39,13 +39,29 @@ class PricingManager {
         return getBundledPricingData()
     }
     
-    /// Calculate cost for a usage entry
-    func calculateCost(for entry: UsageEntry) -> Double {
-        // Use pre-calculated cost if available
-        if let precalculatedCost = entry.cost {
-            return precalculatedCost
+    /// Calculate cost for a usage entry with cost mode support
+    func calculateCost(for entry: UsageEntry, mode: CostMode = .auto) -> Double {
+        switch mode {
+        case .display:
+            // Always use costUSD, return 0 if not available
+            return entry.cost ?? 0.0
+            
+        case .calculate:
+            // Always calculate from tokens, ignore costUSD
+            return calculateCostFromTokens(for: entry)
+            
+        case .auto:
+            // Use costUSD when available, calculate otherwise
+            if let precalculatedCost = entry.cost {
+                return precalculatedCost
+            } else {
+                return calculateCostFromTokens(for: entry)
+            }
         }
-        
+    }
+    
+    /// Calculate cost from token counts
+    private func calculateCostFromTokens(for entry: UsageEntry) -> Double {
         let pricing = getCurrentPricing()
         guard let modelPricing = pricing.models[entry.model] else {
             // Unknown model, use a default rate or return 0
@@ -60,10 +76,10 @@ class PricingManager {
         return inputCost + outputCost + cachedCost
     }
     
-    /// Calculate costs for multiple entries
-    func calculateTotalCost(for entries: [UsageEntry]) -> Double {
+    /// Calculate costs for multiple entries with cost mode support
+    func calculateTotalCost(for entries: [UsageEntry], mode: CostMode = .auto) -> Double {
         return entries.reduce(0.0) { total, entry in
-            total + calculateCost(for: entry)
+            total + calculateCost(for: entry, mode: mode)
         }
     }
     
@@ -115,7 +131,8 @@ class PricingManager {
             "claude-3-5-haiku-20241022": ModelPrice(inputPrice: 0.25, outputPrice: 1.25, cachedPrice: 0.03),
             "claude-3-opus-20240229": ModelPrice(inputPrice: 15.0, outputPrice: 75.0, cachedPrice: 1.5),
             "claude-3-sonnet-20240229": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cachedPrice: 0.3),
-            "claude-3-haiku-20240307": ModelPrice(inputPrice: 0.25, outputPrice: 1.25, cachedPrice: 0.03)
+            "claude-3-haiku-20240307": ModelPrice(inputPrice: 0.25, outputPrice: 1.25, cachedPrice: 0.03),
+            "claude-sonnet-4-20250514": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cachedPrice: 0.3)
         ]
         
         return ModelPricing(models: models)

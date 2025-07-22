@@ -16,6 +16,7 @@ This is a macOS menu bar application that monitors Claude Code spending in real-
 - Follow Swift API design guidelines
 - Use meaningful variable and function names
 - Add documentation comments for public APIs
+- **When removing problematic code, delete it completely - do NOT replace with comments**
 
 ## File Organization
 - Group related functionality into separate Swift files

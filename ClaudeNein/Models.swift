@@ -2,8 +2,145 @@ import Foundation
 
 // MARK: - Core Data Models
 
+// MARK: - Claude Session Log Models
+
+/// Base protocol for all Claude log entries
+protocol ClaudeLogEntry: Codable {
+    var type: String { get }
+    var timestamp: Date? { get }
+}
+
+/// Summary entry from Claude logs
+struct ClaudeSummaryEntry: ClaudeLogEntry {
+    let type: String
+    let summary: String
+    let leafUuid: String
+    let timestamp: Date?
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        summary = try container.decode(String.self, forKey: .summary)
+        leafUuid = try container.decode(String.self, forKey: .leafUuid)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+            .flatMap { ISO8601DateFormatter().date(from: $0) }
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case type, summary, leafUuid, timestamp
+    }
+}
+
+/// User message entry from Claude logs
+struct ClaudeUserEntry: ClaudeLogEntry {
+    let type: String
+    let uuid: String
+    let timestamp: Date?
+    let sessionId: String?
+    let version: String?
+    let cwd: String?
+    let gitBranch: String?
+    let parentUuid: String?
+    let isSidechain: Bool?
+    let userType: String?
+    let isMeta: Bool?
+    let message: ClaudeMessage?
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        uuid = try container.decode(String.self, forKey: .uuid)
+        sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
+        version = try container.decodeIfPresent(String.self, forKey: .version)
+        cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
+        gitBranch = try container.decodeIfPresent(String.self, forKey: .gitBranch)
+        parentUuid = try container.decodeIfPresent(String.self, forKey: .parentUuid)
+        isSidechain = try container.decodeIfPresent(Bool.self, forKey: .isSidechain)
+        userType = try container.decodeIfPresent(String.self, forKey: .userType)
+        isMeta = try container.decodeIfPresent(Bool.self, forKey: .isMeta)
+        message = try container.decodeIfPresent(ClaudeMessage.self, forKey: .message)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+            .flatMap { ISO8601DateFormatter().date(from: $0) }
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case type, uuid, timestamp, sessionId, version, cwd, gitBranch
+        case parentUuid, isSidechain, userType, isMeta, message
+    }
+}
+
+/// Message content within Claude entries
+struct ClaudeMessage: Codable {
+    let role: String?
+    let content: String?
+    let model: String?
+    let usage: ClaudeUsage?
+    
+    enum CodingKeys: String, CodingKey {
+        case role, content, model, usage
+    }
+}
+
+/// Usage information from Claude API responses
+struct ClaudeUsage: Codable {
+    let inputTokens: Int?
+    let outputTokens: Int? 
+    let cacheCreationInputTokens: Int?
+    let cacheReadInputTokens: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case cacheCreationInputTokens = "cache_creation_input_tokens"
+        case cacheReadInputTokens = "cache_read_input_tokens"
+    }
+    
+    /// Convert to TokenCounts format expected by the app
+    var asTokenCounts: TokenCounts? {
+        guard let input = inputTokens, let output = outputTokens else { return nil }
+        let cached = (cacheCreationInputTokens ?? 0) + (cacheReadInputTokens ?? 0)
+        return TokenCounts(
+            input: input,
+            output: output, 
+            cached: cached > 0 ? cached : nil
+        )
+    }
+}
+
+/// Assistant response entry from Claude logs  
+struct ClaudeAssistantEntry: ClaudeLogEntry {
+    let type: String
+    let uuid: String
+    let timestamp: Date?
+    let sessionId: String?
+    let parentUuid: String?
+    let message: ClaudeMessage?
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        uuid = try container.decode(String.self, forKey: .uuid)
+        sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
+        parentUuid = try container.decodeIfPresent(String.self, forKey: .parentUuid)
+        message = try container.decodeIfPresent(ClaudeMessage.self, forKey: .message)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+            .flatMap { ISO8601DateFormatter().date(from: $0) }
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case type, uuid, timestamp, sessionId, parentUuid, message
+    }
+}
+
+/// Cost calculation mode for usage entries
+enum CostMode {
+    case auto      // Use costUSD when available, calculate otherwise
+    case calculate // Always calculate from tokens, ignore costUSD
+    case display   // Always use costUSD, even if undefined (shows 0)
+}
+
 /// Represents a single usage entry from Claude Code JSONL files
-struct UsageEntry: Codable, Equatable {
+struct UsageEntry: Codable, Equatable, Hashable {
     let id: String
     let timestamp: Date
     let model: String
@@ -11,19 +148,23 @@ struct UsageEntry: Codable, Equatable {
     let cost: Double?
     let sessionId: String?
     let projectPath: String?
+    let requestId: String?  // For deduplication
+    let messageId: String?  // For deduplication
     
     enum CodingKeys: String, CodingKey {
         case id
         case timestamp
         case model
         case tokenCounts = "token_counts"
-        case cost
+        case cost = "costUSD"
         case sessionId = "session_id"
         case projectPath = "project_path"
+        case requestId = "requestId"
+        case messageId
     }
     
     // Regular memberwise initializer for testing and direct creation
-    init(id: String, timestamp: Date, model: String, tokenCounts: TokenCounts, cost: Double? = nil, sessionId: String? = nil, projectPath: String? = nil) {
+    init(id: String, timestamp: Date, model: String, tokenCounts: TokenCounts, cost: Double? = nil, sessionId: String? = nil, projectPath: String? = nil, requestId: String? = nil, messageId: String? = nil) {
         self.id = id
         self.timestamp = timestamp
         self.model = model
@@ -31,6 +172,21 @@ struct UsageEntry: Codable, Equatable {
         self.cost = cost
         self.sessionId = sessionId
         self.projectPath = projectPath
+        self.requestId = requestId
+        self.messageId = messageId
+    }
+    
+    /// Generate unique hash for deduplication based on request and message IDs
+    func uniqueHash() -> String? {
+        guard let requestId = requestId, let messageId = messageId else { return nil }
+        return "\(requestId)-\(messageId)"
+    }
+    
+    /// Implement Hashable protocol
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(timestamp)
+        hasher.combine(model)
     }
     
     init(from decoder: Decoder) throws {
@@ -42,6 +198,8 @@ struct UsageEntry: Codable, Equatable {
         cost = try container.decodeIfPresent(Double.self, forKey: .cost)
         sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
         projectPath = try container.decodeIfPresent(String.self, forKey: .projectPath)
+        requestId = try container.decodeIfPresent(String.self, forKey: .requestId)
+        messageId = try container.decodeIfPresent(String.self, forKey: .messageId)
         
         // Handle various timestamp formats
         if let timestampString = try? container.decode(String.self, forKey: .timestamp) {

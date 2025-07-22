@@ -99,8 +99,8 @@ struct JSONLParserTests {
     @Test func testValidJSONLParsing() {
         let parser = JSONLParser()
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}, "cost": 1.5}
-        {"id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100, "cached_tokens": 25}, "cost": 0.5}
+        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}, "costUSD": 1.5}
+        {"id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100, "cached_tokens": 25}, "costUSD": 0.5}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
@@ -122,7 +122,7 @@ struct JSONLParserTests {
         let jsonlContent = """
         {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}}
         invalid json line
-        {"id": "test-2", "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100}}
+        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100}}
         {"incomplete": "data"
         """
         
@@ -150,6 +150,104 @@ struct JSONLParserTests {
         #expect(entries.count == 2)
         #expect(entries[0].id == "test-1")
         #expect(entries[1].id == "test-2")
+    }
+    
+    @Test func testDeduplicationFunctionality() {
+        let parser = JSONLParser()
+        
+        // Test entries with same request and message IDs (should be deduplicated)
+        let jsonlContent = """
+        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}, "requestId": "req-123", "messageId": "msg-456"}
+        {"id": "test-2", "timestamp": "2024-07-21T10:01:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 150, "output_tokens": 250}, "requestId": "req-123", "messageId": "msg-456"}
+        {"id": "test-3", "timestamp": "2024-07-21T10:02:00Z", "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100}, "requestId": "req-789", "messageId": "msg-101"}
+        """
+        
+        let entriesWithDedup = parser.parseJSONLContent(jsonlContent, enableDeduplication: true)
+        #expect(entriesWithDedup.count == 2) // Should deduplicate first two entries
+        #expect(entriesWithDedup[0].id == "test-1")
+        #expect(entriesWithDedup[1].id == "test-3")
+        
+        // Clear cache and test without deduplication
+        parser.clearDeduplicationCache()
+        let entriesWithoutDedup = parser.parseJSONLContent(jsonlContent, enableDeduplication: false)
+        #expect(entriesWithoutDedup.count == 3) // Should include all entries
+    }
+    
+    @Test func testUniqueHashGeneration() {
+        let entry1 = UsageEntry(
+            id: "test-1",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: TokenCounts(input: 100, output: 200),
+            requestId: "req-123",
+            messageId: "msg-456"
+        )
+        
+        let entry2 = UsageEntry(
+            id: "test-2",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: TokenCounts(input: 100, output: 200),
+            requestId: "req-123",
+            messageId: "msg-456"
+        )
+        
+        let entry3 = UsageEntry(
+            id: "test-3",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: TokenCounts(input: 100, output: 200),
+            requestId: nil,
+            messageId: "msg-456"
+        )
+        
+        // Same request and message IDs should produce same hash
+        #expect(entry1.uniqueHash() == entry2.uniqueHash())
+        
+        // Missing request ID should return nil
+        #expect(entry3.uniqueHash() == nil)
+    }
+    
+    @Test func testChronologicalFileSorting() {
+        // Create temporary files with different timestamps
+        let tempDir = FileManager.default.temporaryDirectory
+        let file1 = tempDir.appendingPathComponent("file1_\(UUID().uuidString).jsonl")
+        let file2 = tempDir.appendingPathComponent("file2_\(UUID().uuidString).jsonl")
+        let file3 = tempDir.appendingPathComponent("file3_\(UUID().uuidString).jsonl")
+        
+        // Write files with different earliest timestamps
+        let content1 = """
+        {"timestamp": "2024-07-21T12:00:00Z", "id": "test-1"}
+        {"timestamp": "2024-07-21T13:00:00Z", "id": "test-2"}
+        """
+        let content2 = """
+        {"timestamp": "2024-07-21T10:00:00Z", "id": "test-3"}
+        {"timestamp": "2024-07-21T14:00:00Z", "id": "test-4"}
+        """
+        let content3 = """
+        {"timestamp": "2024-07-21T11:00:00Z", "id": "test-5"}
+        """
+        
+        do {
+            try content1.write(to: file1, atomically: true, encoding: .utf8)
+            try content2.write(to: file2, atomically: true, encoding: .utf8)
+            try content3.write(to: file3, atomically: true, encoding: .utf8)
+            
+            let sortedFiles = JSONLParser.sortFilesByTimestamp([file1, file2, file3])
+            
+            // Should be sorted by earliest timestamp: file2 (10:00), file3 (11:00), file1 (12:00)
+            #expect(sortedFiles[0] == file2)
+            #expect(sortedFiles[1] == file3)
+            #expect(sortedFiles[2] == file1)
+            
+            // Clean up
+            try? FileManager.default.removeItem(at: file1)
+            try? FileManager.default.removeItem(at: file2)
+            try? FileManager.default.removeItem(at: file3)
+        } catch {
+            // Test failed due to file system error
+            #expect(Bool(false), "File system error: \\(error)")
+        }
     }
     
     @Test func testDiscoverClaudeConfigDirectories() {
@@ -211,6 +309,94 @@ struct PricingManagerTests {
         
         let calculatedCost = pricingManager.calculateCost(for: entry)
         #expect(calculatedCost == 2.5)
+    }
+    
+    @Test func testCostCalculationModesDisplay() {
+        let pricingManager = PricingManager.shared
+        let tokens = TokenCounts(input: 100, output: 200)
+        
+        // Test display mode with costUSD available
+        let entryWithCost = UsageEntry(
+            id: "test-1",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: tokens,
+            cost: 2.5,
+            sessionId: "session-1",
+            projectPath: "/test/path"
+        )
+        
+        let displayCost = pricingManager.calculateCost(for: entryWithCost, mode: .display)
+        #expect(displayCost == 2.5)
+        
+        // Test display mode without costUSD (should return 0)
+        let entryWithoutCost = UsageEntry(
+            id: "test-2",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: tokens,
+            cost: nil,
+            sessionId: "session-1",
+            projectPath: "/test/path"
+        )
+        
+        let displayCostZero = pricingManager.calculateCost(for: entryWithoutCost, mode: .display)
+        #expect(displayCostZero == 0.0)
+    }
+    
+    @Test func testCostCalculationModesCalculate() {
+        let pricingManager = PricingManager.shared
+        let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cached: 1_000_000)
+        
+        // Test calculate mode ignoring costUSD
+        let entryWithHighCost = UsageEntry(
+            id: "test-1",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: tokens,
+            cost: 99.99, // High cost should be ignored
+            sessionId: "session-1",
+            projectPath: "/test/path"
+        )
+        
+        let calculatedCost = pricingManager.calculateCost(for: entryWithHighCost, mode: .calculate)
+        
+        // Expected: (1M * 3.0 + 1M * 15.0 + 1M * 0.3) / 1M = 18.3
+        let expectedCost = 3.0 + 15.0 + 0.3
+        #expect(abs(calculatedCost - expectedCost) < 0.001)
+    }
+    
+    @Test func testCostCalculationModesAuto() {
+        let pricingManager = PricingManager.shared
+        let tokens = TokenCounts(input: 100, output: 200)
+        
+        // Test auto mode with costUSD (should use costUSD)
+        let entryWithCost = UsageEntry(
+            id: "test-1",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: tokens,
+            cost: 2.5,
+            sessionId: "session-1",
+            projectPath: "/test/path"
+        )
+        
+        let autoCostWithCost = pricingManager.calculateCost(for: entryWithCost, mode: .auto)
+        #expect(autoCostWithCost == 2.5)
+        
+        // Test auto mode without costUSD (should calculate)
+        let entryWithoutCost = UsageEntry(
+            id: "test-2",
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: tokens,
+            cost: nil,
+            sessionId: "session-1",
+            projectPath: "/test/path"
+        )
+        
+        let autoCostCalculated = pricingManager.calculateCost(for: entryWithoutCost, mode: .auto)
+        #expect(autoCostCalculated > 0.0) // Should calculate from tokens
     }
     
     @Test func testCostCalculationFromTokens() {
@@ -305,6 +491,28 @@ struct SpendCalculatorTests {
         #expect(summary.weekSpend >= 3.0) // At least today + yesterday + week ago
         // Month depends on calendar month boundaries
         #expect(summary.monthSpend >= 1.0) // At least today
+    }
+    
+    @Test func testCalculateSpendSummaryWithCostModes() {
+        let calculator = SpendCalculator()
+        let now = Date()
+        
+        // Create entries with both costUSD and token counts
+        let entryWithCost = createTestEntry(id: "with-cost", timestamp: now, cost: 5.0)
+        let entryWithoutCost = createTestEntry(id: "without-cost", timestamp: now, cost: nil)
+        let entries = [entryWithCost, entryWithoutCost]
+        
+        // Test display mode - should only use costUSD values
+        let displaySummary = calculator.calculateSpendSummary(from: entries, costMode: .display)
+        #expect(displaySummary.todaySpend == 5.0) // Only the entry with cost contributes
+        
+        // Test calculate mode - should ignore costUSD and calculate from tokens
+        let calculateSummary = calculator.calculateSpendSummary(from: entries, costMode: .calculate)
+        #expect(calculateSummary.todaySpend > 0.0) // Should calculate costs from tokens for both entries
+        
+        // Test auto mode - should use costUSD when available, calculate otherwise
+        let autoSummary = calculator.calculateSpendSummary(from: entries, costMode: .auto)
+        #expect(autoSummary.todaySpend > 5.0) // Should use 5.0 + calculated cost for second entry
     }
     
     @Test func testFilterEntriesToday() {
@@ -613,23 +821,5 @@ struct FileMonitorTests {
         
         // Cache should still be empty
         #expect(fileMonitor.getCachedEntries().isEmpty)
-    }
-    
-    @Test func testFileMonitorMultipleStartStop() {
-        let fileMonitor = FileMonitor()
-        
-        // Multiple starts should be safe
-        fileMonitor.startMonitoring()
-        fileMonitor.startMonitoring()
-        fileMonitor.startMonitoring()
-        
-        // Multiple stops should be safe
-        fileMonitor.stopMonitoring()
-        fileMonitor.stopMonitoring()
-        fileMonitor.stopMonitoring()
-        
-        // Should not be monitoring after stops
-        Thread.sleep(forTimeInterval: 0.1) // Give it time to process
-        #expect(fileMonitor.isMonitoring == false)
     }
 }

@@ -89,10 +89,8 @@ class MenuBarManager: ObservableObject {
                 Logger.security.info("🔒 Home directory access changed: \(hasAccess)")
                 self?.updateMenu()
                 if hasAccess {
-                    // Try to start monitoring if access was just granted
                     Task {
                         await self?.fileMonitor.startMonitoring()
-                        self?.refreshSpendingSummary()
                     }
                 }
             }
@@ -218,13 +216,15 @@ class MenuBarManager: ObservableObject {
     
     private func refreshSpendingSummary() {
         Logger.calculator.logTiming("Spending summary calculation") {
-            let entries = fileMonitor.getCachedEntries()
-            Logger.calculator.logDataProcessing("Spending calculation", count: entries.count)
-            let newSummary = spendCalculator.calculateSpendSummary(from: entries)
-            
-            DispatchQueue.main.async { [weak self] in
-                self?.currentSummary = newSummary
-                Logger.calculator.info("💰 Updated spend summary - Today: $\(String(format: "%.2f", newSummary.todaySpend))")
+            fileMonitor.getCachedEntriesAsync { [weak self] entries in
+                guard let self = self else { return }
+                Logger.calculator.logDataProcessing("Spending calculation", count: entries.count)
+                let newSummary = self.spendCalculator.calculateSpendSummary(from: entries)
+                
+                DispatchQueue.main.async {
+                    self.currentSummary = newSummary
+                    Logger.calculator.info("💰 Updated spend summary - Today: $\(String(format: "%.2f", newSummary.todaySpend))")
+                }
             }
         }
     }
