@@ -86,6 +86,9 @@ class FileMonitor: ObservableObject {
     @Published private(set) var isMonitoring = false
     @Published private(set) var lastUpdateTime = Date()
     
+    // Home directory access management
+    private let accessManager: HomeDirectoryAccessManager
+    
     // Use a single serial queue for all file monitoring operations to ensure thread safety
     private let monitorQueue = DispatchQueue(label: "fileMonitor", qos: .utility)
     
@@ -119,6 +122,10 @@ class FileMonitor: ObservableObject {
     
     // MARK: - Initialization
     
+    init(accessManager: HomeDirectoryAccessManager = HomeDirectoryAccessManager()) {
+        self.accessManager = accessManager
+    }
+    
     deinit {
         stopMonitoring()
     }
@@ -126,8 +133,19 @@ class FileMonitor: ObservableObject {
     // MARK: - Public Methods
     
     /// Start monitoring Claude config directories
-    func startMonitoring() {
+    func startMonitoring() async {
         guard !isMonitoring else { return }
+        
+        // Ensure we have home directory access before starting monitoring
+        if !accessManager.hasValidAccess {
+            Logger.security.info("🔒 Requesting home directory access for file monitoring")
+            let accessGranted = await accessManager.requestHomeDirectoryAccess()
+            
+            if !accessGranted {
+                Logger.security.error("❌ Cannot start monitoring without home directory access")
+                return
+            }
+        }
         
         monitorQueue.async { [weak self] in
             self?.setupMonitoring()
@@ -172,13 +190,18 @@ class FileMonitor: ObservableObject {
         }
     }
     
+    /// Get access to the home directory access manager
+    var homeDirectoryAccessManager: HomeDirectoryAccessManager {
+        return accessManager
+    }
+    
     // MARK: - Private Methods
     
     private func setupMonitoring() {
         Logger.fileMonitor.debug("🔧 Setting up file monitoring")
         
-        // Find Claude directories
-        monitoredDirectories = JSONLParser.findClaudeConfigDirectories()
+        // Find Claude directories using secured access
+        monitoredDirectories = JSONLParser.findClaudeConfigDirectories(accessManager: accessManager)
         
         guard !monitoredDirectories.isEmpty else {
             Logger.fileMonitor.error("⚠️ No Claude config directories found for monitoring")

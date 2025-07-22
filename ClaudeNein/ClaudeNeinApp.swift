@@ -82,12 +82,30 @@ class MenuBarManager: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Start monitoring
-        fileMonitor.startMonitoring()
+        // Subscribe to home directory access changes
+        fileMonitor.homeDirectoryAccessManager.$hasAccess
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] hasAccess in
+                Logger.security.info("🔒 Home directory access changed: \(hasAccess)")
+                self?.updateMenu()
+                if hasAccess {
+                    // Try to start monitoring if access was just granted
+                    Task {
+                        await self?.fileMonitor.startMonitoring()
+                        self?.refreshSpendingSummary()
+                    }
+                }
+            }
+            .store(in: &cancellables)
         
-        // Initial data refresh
-        refreshSpendingSummary()
-        Logger.fileMonitor.info("✅ File monitoring setup completed")
+        // Start monitoring asynchronously
+        Task {
+            await fileMonitor.startMonitoring()
+            await MainActor.run {
+                refreshSpendingSummary()
+                Logger.fileMonitor.info("✅ File monitoring setup completed")
+            }
+        }
     }
     
     private func setupMenu() {
@@ -132,6 +150,28 @@ class MenuBarManager: ObservableObject {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Home directory access status
+        let accessManager = fileMonitor.homeDirectoryAccessManager
+        if accessManager.hasValidAccess {
+            let accessItem = NSMenuItem(title: "✅ Home Directory Access: Granted", action: nil, keyEquivalent: "")
+            accessItem.isEnabled = false
+            menu.addItem(accessItem)
+            
+            let revokeItem = NSMenuItem(title: "Revoke Access", action: #selector(revokeAccess), keyEquivalent: "")
+            revokeItem.target = self
+            menu.addItem(revokeItem)
+        } else {
+            let accessItem = NSMenuItem(title: "❌ Home Directory Access: Required", action: nil, keyEquivalent: "")
+            accessItem.isEnabled = false
+            menu.addItem(accessItem)
+            
+            let grantItem = NSMenuItem(title: "Grant Access...", action: #selector(requestAccess), keyEquivalent: "")
+            grantItem.target = self
+            menu.addItem(grantItem)
+        }
+        
+        menu.addItem(NSMenuItem.separator())
+        
         let refreshItem = NSMenuItem(title: "Refresh", action: #selector(refreshData), keyEquivalent: "r")
         refreshItem.target = self
         menu.addItem(refreshItem)
@@ -153,6 +193,20 @@ class MenuBarManager: ObservableObject {
         Logger.app.info("🔄 Manual refresh requested")
         fileMonitor.forceRefresh()
         refreshSpendingSummary()
+    }
+    
+    @objc private func requestAccess() {
+        Logger.security.info("🔒 User requested home directory access")
+        Task {
+            let granted = await fileMonitor.homeDirectoryAccessManager.requestHomeDirectoryAccess()
+            Logger.security.info("🔒 Home directory access request result: \(granted)")
+        }
+    }
+    
+    @objc private func revokeAccess() {
+        Logger.security.info("🚫 User requested to revoke home directory access")
+        fileMonitor.homeDirectoryAccessManager.revokeAccess()
+        fileMonitor.stopMonitoring()
     }
     
     @objc private func quitApp() {

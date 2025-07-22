@@ -88,22 +88,34 @@ class JSONLParser {
     }
     
     /// Discover Claude config directories on the system
-    static func findClaudeConfigDirectories() -> [URL] {
+    /// - Parameter accessManager: Optional access manager for secured directory access
+    /// - Returns: Array of accessible Claude config directory URLs
+    static func findClaudeConfigDirectories(accessManager: HomeDirectoryAccessManager? = nil) -> [URL] {
         Logger.parser.debug("🔍 Searching for Claude config directories")
         var directories: [URL] = []
         let fileManager = FileManager.default
         
-        // Standard locations
-        let homeDirectory = fileManager.homeDirectoryForCurrentUser
-        let claudeDir = homeDirectory.appendingPathComponent(".claude/projects")
-        let configClaudeDir = homeDirectory.appendingPathComponent(".config/claude/projects")
+        // Get the base directory for searching
+        let baseDirectory: URL
+        if let accessManager = accessManager, let securedURL = accessManager.getSecuredHomeDirectoryURL() {
+            baseDirectory = securedURL
+            Logger.parser.debug("🔒 Using secured access to search from: \(securedURL.path, privacy: .private)")
+        } else {
+            baseDirectory = fileManager.homeDirectoryForCurrentUser
+            Logger.parser.debug("🏠 Using standard home directory access")
+        }
         
-        if fileManager.fileExists(atPath: claudeDir.path) {
+        // Standard locations relative to the base directory
+        let claudeDir = baseDirectory.appendingPathComponent(".claude/projects")
+        let configClaudeDir = baseDirectory.appendingPathComponent(".config/claude/projects")
+        
+        // Check if directories exist and are accessible
+        if isDirectoryAccessible(claudeDir, accessManager: accessManager) {
             Logger.parser.debug("📁 Found standard Claude directory: \(claudeDir.path, privacy: .private)")
             directories.append(claudeDir)
         }
         
-        if fileManager.fileExists(atPath: configClaudeDir.path) {
+        if isDirectoryAccessible(configClaudeDir, accessManager: accessManager) {
             Logger.parser.debug("📁 Found config Claude directory: \(configClaudeDir.path, privacy: .private)")
             directories.append(configClaudeDir)
         }
@@ -111,7 +123,7 @@ class JSONLParser {
         // Custom directory from environment variable
         if let customPath = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"] {
             let customURL = URL(fileURLWithPath: customPath)
-            if fileManager.fileExists(atPath: customURL.path) {
+            if isDirectoryAccessible(customURL, accessManager: accessManager) {
                 Logger.parser.debug("📁 Found custom Claude directory from env: \(customURL.path, privacy: .private)")
                 directories.append(customURL)
             }
@@ -119,6 +131,24 @@ class JSONLParser {
         
         Logger.parser.info("📁 Found \(directories.count) Claude config directories")
         return directories
+    }
+    
+    /// Check if a directory is accessible, handling both secured and standard access
+    private static func isDirectoryAccessible(_ directory: URL, accessManager: HomeDirectoryAccessManager?) -> Bool {
+        let fileManager = FileManager.default
+        
+        // Check basic existence first
+        guard fileManager.fileExists(atPath: directory.path) else {
+            return false
+        }
+        
+        // If we have an access manager, verify we can access this path
+        if let accessManager = accessManager {
+            return accessManager.canAccess(path: directory.path)
+        }
+        
+        // For non-secured access, just check if it exists and is readable
+        return fileManager.isReadableFile(atPath: directory.path)
     }
     
     /// Recursively discover all JSONL files in given directories

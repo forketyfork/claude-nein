@@ -63,38 +63,38 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Background processing to avoid UI blocking
 
 ### Phase 5: Menu Bar Interface
-- [ ] Create `MenuBarManager` class:
-  - [ ] Initialize NSStatusItem with custom icon
-  - [ ] Handle menu bar icon clicks
-  - [ ] Manage menu show/hide behavior
-- [ ] Design menu bar icon:
-  - [ ] Create icon showing today's spend amount
-  - [ ] Use appropriate font size and styling
-  - [ ] Handle long spend amounts gracefully
-  - [ ] Support dark/light mode theming
-- [ ] Implement icon update logic:
-  - [ ] Update icon text when spend changes
-  - [ ] Animate icon changes smoothly
-  - [ ] Handle edge cases (no data, errors)
+- [x] Create `MenuBarManager` class:
+  - [x] Initialize NSStatusItem with custom icon
+  - [x] Handle menu bar icon clicks
+  - [x] Manage menu show/hide behavior
+- [x] Design menu bar icon:
+  - [x] Create icon showing today's spend amount
+  - [x] Use appropriate font size and styling
+  - [x] Handle long spend amounts gracefully
+  - [x] Support dark/light mode theming
+- [x] Implement icon update logic:
+  - [x] Update icon text when spend changes
+  - [x] Animate icon changes smoothly
+  - [x] Handle edge cases (no data, errors)
 
 ### Phase 6: Dropdown Menu UI
-- [ ] Create SwiftUI views for menu content:
-  - [ ] `SpendSummaryView` - main menu content
-  - [ ] `PeriodSpendRow` - individual period display
-  - [ ] `ModelBreakdownView` - spending by model
-- [ ] Implement menu layout:
-  - [ ] Today's spend (prominent display)
-  - [ ] This week's spend
-  - [ ] This month's spend
-  - [ ] Separator and additional options
-- [ ] Add interactive elements:
-  - [ ] "Refresh" menu item for manual updates
-  - [ ] "Open Claude Directory" menu item
-  - [ ] "Quit" menu item
-- [ ] Style menu for native macOS look:
-  - [ ] Use system fonts and colors
-  - [ ] Proper spacing and alignment
-  - [ ] Support dark/light mode
+- [x] Create SwiftUI views for menu content:
+  - [x] `SpendSummaryView` - main menu content (implemented in NSMenu)
+  - [x] `PeriodSpendRow` - individual period display (implemented in NSMenu)
+  - [x] `ModelBreakdownView` - spending by model (implemented in NSMenu)
+- [x] Implement menu layout:
+  - [x] Today's spend (prominent display)
+  - [x] This week's spend
+  - [x] This month's spend
+  - [x] Separator and additional options
+- [x] Add interactive elements:
+  - [x] "Refresh" menu item for manual updates
+  - [x] "Grant/Revoke Access" menu items for home directory permissions
+  - [x] "Quit" menu item
+- [x] Style menu for native macOS look:
+  - [x] Use system fonts and colors
+  - [x] Proper spacing and alignment
+  - [x] Support dark/light mode
 
 ### Phase 7: Settings & Preferences
 - [ ] Create preferences window (optional):
