@@ -5,23 +5,23 @@
 //  Created by Forketyfork on 21.07.25.
 //
 
-import XCTest
+import Testing
 import Foundation
 @testable import ClaudeNein
 
-class ClaudeNeinTests: XCTestCase {
+struct ClaudeNeinTests {
     
     // MARK: - Models Tests
     
-    func testTokenCountsTotal() {
+    @Test func testTokenCountsTotal() {
         let tokens1 = TokenCounts(input: 100, output: 200, cached: 50)
-        XCTAssertEqual(tokens1.total, 350)
+        #expect(tokens1.total == 350)
         
         let tokens2 = TokenCounts(input: 100, output: 200, cached: nil)
-        XCTAssertEqual(tokens2.total, 300)
+        #expect(tokens2.total == 300)
     }
     
-    func testUsageEntryEquality() {
+    @Test func testUsageEntryEquality() {
         let date = Date()
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -45,10 +45,10 @@ class ClaudeNeinTests: XCTestCase {
             projectPath: "/test/path"
         )
         
-        XCTAssertEqual(entry1, entry2)
+        #expect(entry1 == entry2)
     }
     
-    func testSessionBlockInitialization() {
+    @Test func testSessionBlockInitialization() {
         let startTime = Date()
         let tokens1 = TokenCounts(input: 100, output: 200, cached: 50)
         let tokens2 = TokenCounts(input: 150, output: 300)
@@ -75,27 +75,27 @@ class ClaudeNeinTests: XCTestCase {
         
         let sessionBlock = SessionBlock(startTime: startTime, entries: [entry1, entry2])
         
-        XCTAssertEqual(sessionBlock.totalTokens.input, 250)
-        XCTAssertEqual(sessionBlock.totalTokens.output, 500)
-        XCTAssertEqual(sessionBlock.totalTokens.cached, 50)
-        XCTAssertEqual(sessionBlock.totalCost, 3.5)
-        XCTAssertEqual(sessionBlock.entries.count, 2)
+        #expect(sessionBlock.totalTokens.input == 250)
+        #expect(sessionBlock.totalTokens.output == 500)
+        #expect(sessionBlock.totalTokens.cached == 50)
+        #expect(sessionBlock.totalCost == 3.5)
+        #expect(sessionBlock.entries.count == 2)
     }
     
-    func testSpendSummaryEmpty() {
+    @Test func testSpendSummaryEmpty() {
         let emptySummary = SpendSummary.empty
-        XCTAssertEqual(emptySummary.todaySpend, 0.0)
-        XCTAssertEqual(emptySummary.weekSpend, 0.0)
-        XCTAssertEqual(emptySummary.monthSpend, 0.0)
-        XCTAssertTrue(emptySummary.modelBreakdown.isEmpty)
+        #expect(emptySummary.todaySpend == 0.0)
+        #expect(emptySummary.weekSpend == 0.0)
+        #expect(emptySummary.monthSpend == 0.0)
+        #expect(emptySummary.modelBreakdown.isEmpty)
     }
 }
 
 // MARK: - JSONLParser Tests
 
-class JSONLParserTests: XCTestCase {
+struct JSONLParserTests {
     
-    func testValidJSONLParsing() {
+    @Test func testValidJSONLParsing() {
         let parser = JSONLParser()
         let jsonlContent = """
         {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}, "cost": 1.5}
@@ -104,19 +104,19 @@ class JSONLParserTests: XCTestCase {
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
-        XCTAssertEqual(entries.count, 2)
-        XCTAssertEqual(entries[0].id, "test-1")
-        XCTAssertEqual(entries[0].model, "claude-3-5-sonnet-20241022")
-        XCTAssertEqual(entries[0].tokenCounts.input, 100)
-        XCTAssertEqual(entries[0].tokenCounts.output, 200)
-        XCTAssertEqual(entries[0].cost, 1.5)
+        #expect(entries.count == 2)
+        #expect(entries[0].id == "test-1")
+        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
+        #expect(entries[0].tokenCounts.input == 100)
+        #expect(entries[0].tokenCounts.output == 200)
+        #expect(entries[0].cost == 1.5)
         
-        XCTAssertEqual(entries[1].id, "test-2")
-        XCTAssertEqual(entries[1].model, "claude-3-5-haiku-20241022")
-        XCTAssertEqual(entries[1].tokenCounts.cached, 25)
+        #expect(entries[1].id == "test-2")
+        #expect(entries[1].model == "claude-3-5-haiku-20241022")
+        #expect(entries[1].tokenCounts.cached == 25)
     }
     
-    func testMalformedJSONLHandling() {
+    @Test func testMalformedJSONLHandling() {
         let parser = JSONLParser()
         let jsonlContent = """
         {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}}
@@ -128,12 +128,12 @@ class JSONLParserTests: XCTestCase {
         let entries = parser.parseJSONLContent(jsonlContent)
         
         // Should successfully parse valid entries and skip malformed ones
-        XCTAssertEqual(entries.count, 2)
-        XCTAssertEqual(entries[0].id, "test-1")
-        XCTAssertEqual(entries[1].id, "test-2")
+        #expect(entries.count == 2)
+        #expect(entries[0].id == "test-1")
+        #expect(entries[1].id == "test-2")
     }
     
-    func testEmptyAndWhitespaceLines() {
+    @Test func testEmptyAndWhitespaceLines() {
         let parser = JSONLParser()
         let jsonlContent = """
         
@@ -146,17 +146,17 @@ class JSONLParserTests: XCTestCase {
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
-        XCTAssertEqual(entries.count, 2)
-        XCTAssertEqual(entries[0].id, "test-1")
-        XCTAssertEqual(entries[1].id, "test-2")
+        #expect(entries.count == 2)
+        #expect(entries[0].id == "test-1")
+        #expect(entries[1].id == "test-2")
     }
     
-    func testDiscoverClaudeConfigDirectories() {
+    @Test func testDiscoverClaudeConfigDirectories() {
         let directories = JSONLParser.findClaudeConfigDirectories()
         
         // Should return at least some directories (even if they don't exist)
         // The function checks standard locations and environment variables
-        XCTAssertGreaterThanOrEqual(directories.count, 0)
+        #expect(directories.count >= 0)
         
         // Check that standard paths are included if they exist
         let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
@@ -164,37 +164,37 @@ class JSONLParserTests: XCTestCase {
         let configClaudeDir = homeDirectory.appendingPathComponent(".config/claude/projects")
         
         if FileManager.default.fileExists(atPath: claudeDir.path) {
-            XCTAssertTrue(directories.contains(claudeDir))
+            #expect(directories.contains(claudeDir))
         }
         
         if FileManager.default.fileExists(atPath: configClaudeDir.path) {
-            XCTAssertTrue(directories.contains(configClaudeDir))
+            #expect(directories.contains(configClaudeDir))
         }
     }
 }
 
 // MARK: - PricingManager Tests
 
-class PricingManagerTests: XCTestCase {
+struct PricingManagerTests {
     
-    func testBundledPricingData() {
+    @Test func testBundledPricingData() {
         let pricingManager = PricingManager.shared
         let pricing = pricingManager.getCurrentPricing()
         
         // Verify bundled data contains expected models
-        XCTAssertNotNil(pricing.models["claude-3-5-sonnet-20241022"])
-        XCTAssertNotNil(pricing.models["claude-3-5-haiku-20241022"])
-        XCTAssertNotNil(pricing.models["claude-3-opus-20240229"])
+        #expect(pricing.models["claude-3-5-sonnet-20241022"] != nil)
+        #expect(pricing.models["claude-3-5-haiku-20241022"] != nil)
+        #expect(pricing.models["claude-3-opus-20240229"] != nil)
         
         // Verify pricing structure
         if let sonnetPricing = pricing.models["claude-3-5-sonnet-20241022"] {
-            XCTAssertEqual(sonnetPricing.inputPrice, 3.0)
-            XCTAssertEqual(sonnetPricing.outputPrice, 15.0)
-            XCTAssertEqual(sonnetPricing.cachedPrice, 0.3)
+            #expect(sonnetPricing.inputPrice == 3.0)
+            #expect(sonnetPricing.outputPrice == 15.0)
+            #expect(sonnetPricing.cachedPrice == 0.3)
         }
     }
     
-    func testCostCalculationWithPrecalculatedCost() {
+    @Test func testCostCalculationWithPrecalculatedCost() {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -209,10 +209,10 @@ class PricingManagerTests: XCTestCase {
         )
         
         let calculatedCost = pricingManager.calculateCost(for: entry)
-        XCTAssertEqual(calculatedCost, 2.5)
+        #expect(calculatedCost == 2.5)
     }
     
-    func testCostCalculationFromTokens() {
+    @Test func testCostCalculationFromTokens() {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cached: 1_000_000)
         
@@ -230,10 +230,10 @@ class PricingManagerTests: XCTestCase {
         
         // Expected: (1M * 3.0 + 1M * 15.0 + 1M * 0.3) / 1M = 18.3
         let expectedCost = 3.0 + 15.0 + 0.3
-        XCTAssertEqual(calculatedCost, expectedCost, accuracy: 0.001)
+        #expect(abs(calculatedCost - expectedCost) < 0.001)
     }
     
-    func testCostCalculationUnknownModel() {
+    @Test func testCostCalculationUnknownModel() {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -248,10 +248,10 @@ class PricingManagerTests: XCTestCase {
         )
         
         let calculatedCost = pricingManager.calculateCost(for: entry)
-        XCTAssertEqual(calculatedCost, 0.0) // Should return 0 for unknown models
+        #expect(calculatedCost == 0.0) // Should return 0 for unknown models
     }
     
-    func testCalculateTotalCostForMultipleEntries() {
+    @Test func testCalculateTotalCostForMultipleEntries() {
         let pricingManager = PricingManager.shared
         
         let entry1 = UsageEntry(
@@ -278,15 +278,15 @@ class PricingManagerTests: XCTestCase {
         
         // Expected: 3.0 (Sonnet input) + 0.25 (Haiku input) = 3.25
         let expectedCost = 3.0 + 0.25
-        XCTAssertEqual(totalCost, expectedCost, accuracy: 0.001)
+        #expect(abs(totalCost - expectedCost) < 0.001)
     }
 }
 
 // MARK: - SpendCalculator Tests
 
-class SpendCalculatorTests: XCTestCase {
+struct SpendCalculatorTests {
     
-    func testCalculateSpendSummary() {
+    @Test func testCalculateSpendSummary() {
         let calculator = SpendCalculator()
         let now = Date()
         
@@ -299,14 +299,14 @@ class SpendCalculatorTests: XCTestCase {
         let entries = [todayEntry, yesterdayEntry, weekAgoEntry, monthAgoEntry]
         let summary = calculator.calculateSpendSummary(from: entries)
         
-        XCTAssertEqual(summary.todaySpend, 1.0)
+        #expect(summary.todaySpend == 1.0)
         // Week includes today + yesterday + week ago (last 7 days)
-        XCTAssertGreaterThanOrEqual(summary.weekSpend, 3.0) // At least today + yesterday + week ago
+        #expect(summary.weekSpend >= 3.0) // At least today + yesterday + week ago
         // Month depends on calendar month boundaries
-        XCTAssertGreaterThanOrEqual(summary.monthSpend, 1.0) // At least today
+        #expect(summary.monthSpend >= 1.0) // At least today
     }
     
-    func testFilterEntriesToday() {
+    @Test func testFilterEntriesToday() {
         let calculator = SpendCalculator()
         let now = Date()
         let calendar = Calendar.current
@@ -320,14 +320,14 @@ class SpendCalculatorTests: XCTestCase {
         let summary = calculator.calculateSpendSummary(from: entries)
         
         // Only today's entries should contribute to todaySpend
-        XCTAssertGreaterThan(summary.todaySpend, 0)
+        #expect(summary.todaySpend > 0)
         
         // Calculate expected today spend manually
         let expectedTodaySpend = PricingManager.shared.calculateTotalCost(for: [todayEntry1, todayEntry2])
-        XCTAssertEqual(summary.todaySpend, expectedTodaySpend, accuracy: 0.001)
+        #expect(abs(summary.todaySpend - expectedTodaySpend) < 0.001)
     }
     
-    func testCalculateDailySpendForSpecificDate() {
+    @Test func testCalculateDailySpendForSpecificDate() {
         let calculator = SpendCalculator()
         let calendar = Calendar.current
         let targetDate = Date()
@@ -340,10 +340,10 @@ class SpendCalculatorTests: XCTestCase {
         let entries = [targetEntry1, targetEntry2, otherDateEntry]
         let dailySpend = calculator.calculateDailySpend(from: entries, for: targetDate)
         
-        XCTAssertEqual(dailySpend, 4.0) // 1.5 + 2.5
+        #expect(dailySpend == 4.0) // 1.5 + 2.5
     }
     
-    func testCalculateSpendInRange() {
+    @Test func testCalculateSpendInRange() {
         let calculator = SpendCalculator()
         let calendar = Calendar.current
         let endDate = Date()
@@ -357,10 +357,10 @@ class SpendCalculatorTests: XCTestCase {
         let entries = [inRangeEntry1, inRangeEntry2, outOfRangeEntry]
         let rangeSpend = calculator.calculateSpendInRange(from: entries, startDate: startDate, endDate: endDate)
         
-        XCTAssertEqual(rangeSpend, 3.0) // 1.0 + 2.0
+        #expect(rangeSpend == 3.0) // 1.0 + 2.0
     }
     
-    func testCalculateModelBreakdown() {
+    @Test func testCalculateModelBreakdown() {
         let calculator = SpendCalculator()
         
         // Create entries with different models
@@ -371,9 +371,9 @@ class SpendCalculatorTests: XCTestCase {
         let entries = [sonnetEntry1, sonnetEntry2, haikuEntry]
         let breakdown = calculator.calculateModelBreakdown(from: entries)
         
-        XCTAssertEqual(breakdown["claude-3-5-sonnet-20241022"], 5.0)
-        XCTAssertEqual(breakdown["claude-3-5-haiku-20241022"], 1.0)
-        XCTAssertEqual(breakdown.count, 2)
+        #expect(breakdown["claude-3-5-sonnet-20241022"] == 5.0)
+        #expect(breakdown["claude-3-5-haiku-20241022"] == 1.0)
+        #expect(breakdown.count == 2)
     }
     
     // Helper method to create test entries
@@ -397,9 +397,9 @@ class SpendCalculatorTests: XCTestCase {
 
 // MARK: - SpendSummary Formatting Tests
 
-class SpendSummaryFormattingTests: XCTestCase {
+struct SpendSummaryFormattingTests {
     
-    func testSpendFormatting() {
+    @Test func testSpendFormatting() {
         let summary = SpendSummary(
             todaySpend: 1.2345,
             weekSpend: 0.0067,
@@ -408,57 +408,57 @@ class SpendSummaryFormattingTests: XCTestCase {
         )
         
         // Test currency formatting
-        XCTAssertTrue(summary.formattedTodaySpend.contains("1.23") || summary.formattedTodaySpend.contains("1.2345"))
-        XCTAssertTrue(summary.formattedWeekSpend.contains("0.00") || summary.formattedWeekSpend.contains("0.006"))
-        XCTAssertTrue(summary.formattedMonthSpend.contains("123.46") || summary.formattedMonthSpend.contains("123.456"))
+        #expect(summary.formattedTodaySpend.contains("1.23") || summary.formattedTodaySpend.contains("1.2345"))
+        #expect(summary.formattedWeekSpend.contains("0.00") || summary.formattedWeekSpend.contains("0.006"))
+        #expect(summary.formattedMonthSpend.contains("123.46") || summary.formattedMonthSpend.contains("123.456"))
         
         // Test model breakdown formatting
         let formattedBreakdown = summary.formattedModelBreakdown
-        XCTAssertEqual(formattedBreakdown.count, 2)
+        #expect(formattedBreakdown.count == 2)
         
         // Should be sorted by spend amount (descending)
-        XCTAssertEqual(formattedBreakdown[0].model, "claude-3-5-sonnet-20241022")
-        XCTAssertEqual(formattedBreakdown[1].model, "claude-3-5-haiku-20241022")
+        #expect(formattedBreakdown[0].model == "claude-3-5-sonnet-20241022")
+        #expect(formattedBreakdown[1].model == "claude-3-5-haiku-20241022")
     }
     
-    func testSmallAmountFormatting() {
+    @Test func testSmallAmountFormatting() {
         let summary = SpendSummary(todaySpend: 0.000123)
         
         // Small amounts should show more decimal places
         let formatted = summary.formattedTodaySpend
-        XCTAssertTrue(formatted.contains("0.000123") || formatted.contains("$0.00"))
+        #expect(formatted.contains("0.000123") || formatted.contains("$0.00"))
     }
 }
 
 // MARK: - Error Handling Tests
 
-class ErrorHandlingTests: XCTestCase {
+struct ErrorHandlingTests {
     
-    func testPricingManagerWithEmptyEntries() {
+    @Test func testPricingManagerWithEmptyEntries() {
         let pricingManager = PricingManager.shared
         let totalCost = pricingManager.calculateTotalCost(for: [])
         
-        XCTAssertEqual(totalCost, 0.0)
+        #expect(totalCost == 0.0)
     }
     
-    func testSpendCalculatorWithEmptyEntries() {
+    @Test func testSpendCalculatorWithEmptyEntries() {
         let calculator = SpendCalculator()
         let summary = calculator.calculateSpendSummary(from: [])
         
-        XCTAssertEqual(summary.todaySpend, 0.0)
-        XCTAssertEqual(summary.weekSpend, 0.0)
-        XCTAssertEqual(summary.monthSpend, 0.0)
-        XCTAssertTrue(summary.modelBreakdown.isEmpty)
+        #expect(summary.todaySpend == 0.0)
+        #expect(summary.weekSpend == 0.0)
+        #expect(summary.monthSpend == 0.0)
+        #expect(summary.modelBreakdown.isEmpty)
     }
     
-    func testJSONLParserWithEmptyContent() {
+    @Test func testJSONLParserWithEmptyContent() {
         let parser = JSONLParser()
         let entries = parser.parseJSONLContent("")
         
-        XCTAssertTrue(entries.isEmpty)
+        #expect(entries.isEmpty)
     }
     
-    func testUsageEntryCustomInit() {
+    @Test func testUsageEntryCustomInit() {
         // Test direct initialization of UsageEntry
         let tokens = TokenCounts(input: 100, output: 200, cached: 50)
         let date = Date()
@@ -473,12 +473,12 @@ class ErrorHandlingTests: XCTestCase {
             projectPath: "/custom/path"
         )
         
-        XCTAssertEqual(entry.id, "custom-test")
-        XCTAssertEqual(entry.timestamp, date)
-        XCTAssertEqual(entry.model, "test-model")
-        XCTAssertEqual(entry.tokenCounts, tokens)
-        XCTAssertEqual(entry.cost, 1.5)
-        XCTAssertEqual(entry.sessionId, "session-test")
-        XCTAssertEqual(entry.projectPath, "/custom/path")
+        #expect(entry.id == "custom-test")
+        #expect(entry.timestamp == date)
+        #expect(entry.model == "test-model")
+        #expect(entry.tokenCounts == tokens)
+        #expect(entry.cost == 1.5)
+        #expect(entry.sessionId == "session-test")
+        #expect(entry.projectPath == "/custom/path")
     }
 }
