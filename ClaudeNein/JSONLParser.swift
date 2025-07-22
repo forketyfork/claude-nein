@@ -63,160 +63,80 @@ class JSONLParser {
     }
     
     /// Parse a single JSON line, handling malformed data gracefully
-    private func parseJSONLine(_ line: String, lineNumber: Int) -> UsageEntry? {
+    func parseJSONLine(_ line: String, lineNumber: Int) -> UsageEntry? {
         guard let data = line.data(using: .utf8) else {
-            logParsingError("Invalid UTF-8 encoding", lineNumber: lineNumber, line: line)
             return nil
         }
         
-        // First, try to parse as standard usage entry format
-        if let usageEntry = parseStandardFormat(data: data, lineNumber: lineNumber) {
-            return usageEntry
-        }
-        
-        // Second, try to parse as Claude log entry to extract usage data
-        if let usageEntry = parseClaudeLogEntry(data: data, lineNumber: lineNumber) {
-            return usageEntry
-        }
-        
-        // Fall back to parsing as direct UsageEntry (for backward compatibility)
+        // Parse as JSON and check for required fields
         do {
-            let entry = try decoder.decode(UsageEntry.self, from: data)
-            return entry
-        } catch {
-            // Silently skip invalid lines for robustness
-            Logger.parser.debug("⚠️ Skipping invalid JSON line \(lineNumber): \(error.localizedDescription)")
-            return nil
-        }
-    }
-    
-    /// Parse Claude log entry and extract usage data if available
-    private func parseClaudeLogEntry(data: Data, lineNumber: Int) -> UsageEntry? {
-        // Try to parse as assistant entry first (has usage data)
-        if let assistantEntry = try? decoder.decode(ClaudeAssistantEntry.self, from: data),
-           assistantEntry.type == "assistant",
-           let message = assistantEntry.message,
-           let model = message.model,
-           let usage = message.usage,
-           let tokenCounts = usage.asTokenCounts,
-           let timestamp = assistantEntry.timestamp {
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
             
-            Logger.parser.debug("✅ Parsed assistant entry: \(tokenCounts.total) tokens from model \(model)")
+            // Check for required fields: model, usage, timestamp
+            guard let model = json["model"] as? String ?? (json["message"] as? [String: Any])?["model"] as? String,
+                  let usage = json["usage"] as? [String: Any] ?? (json["message"] as? [String: Any])?["usage"] as? [String: Any] else {
+                return nil
+            }
+            
+            // Parse timestamp - handle both string and numeric formats
+            let timestamp: Date
+            if let timestampString = json["timestamp"] as? String {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                guard let date = formatter.date(from: timestampString) ?? ISO8601DateFormatter().date(from: timestampString) else {
+                    return nil
+                }
+                timestamp = date
+            } else if let timestampNumber = json["timestamp"] as? Double {
+                timestamp = Date(timeIntervalSince1970: timestampNumber)
+            } else {
+                return nil
+            }
+            
+            // Extract token counts from usage
+            guard let inputTokens = usage["input_tokens"] as? Int,
+                  let outputTokens = usage["output_tokens"] as? Int else {
+                return nil
+            }
+            
+            // Extract separate cache creation and cache read tokens
+            let cacheCreationTokens = usage["cache_creation_input_tokens"] as? Int
+            let cacheReadTokens = usage["cache_read_input_tokens"] as? Int
+            
+            let tokenCounts = TokenCounts(
+                input: inputTokens,
+                output: outputTokens,
+                cacheCreation: cacheCreationTokens,
+                cacheRead: cacheReadTokens
+            )
+            
+            // Extract optional fields - handle both nested and flat structures
+            let messageId = (json["message"] as? [String: Any])?["id"] as? String ?? json["messageId"] as? String ?? json["id"] as? String
+            let requestId = json["requestId"] as? String
+            let costUSD = json["costUSD"] as? Double
+            
+            // Generate ID
+            let id = messageId ?? UUID().uuidString
             
             return UsageEntry(
-                id: assistantEntry.uuid,
+                id: id,
                 timestamp: timestamp,
                 model: model,
                 tokenCounts: tokenCounts,
-                cost: nil, // Cost will be calculated by PricingManager
-                sessionId: assistantEntry.sessionId,
+                cost: costUSD,
+                sessionId: json["sessionId"] as? String,
                 projectPath: nil,
-                requestId: nil, // TODO: Extract from logs when available
-                messageId: assistantEntry.uuid // Use UUID as message ID for deduplication
+                requestId: requestId,
+                messageId: messageId
             )
-        }
-        
-        // Try parsing as user entry (no usage data, but we can track sessions)
-        if let userEntry = try? decoder.decode(ClaudeUserEntry.self, from: data),
-           userEntry.type == "user" {
-            // For now, skip user entries as they don't contain usage data
-            return nil
-        }
-        
-        // Try parsing as summary entry (no usage data)
-        if let summaryEntry = try? decoder.decode(ClaudeSummaryEntry.self, from: data),
-           summaryEntry.type == "summary" {
-            // For now, skip summary entries as they don't contain usage data
-            return nil
-        }
-        
-        return nil
-    }
-    
-    /// Parse standard usage entry format with proper schema validation
-    private func parseStandardFormat(data: Data, lineNumber: Int) -> UsageEntry? {
-        do {
-            // Parse the JSON structure for standard usage format
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                return parseUsageEntryFormat(json: json)
-            }
+            
         } catch {
-            // Not valid JSON or not standard format
-        }
-        return nil
-    }
-    
-    /// Parse JSON dictionary in standard usage entry format
-    private func parseUsageEntryFormat(json: [String: Any]) -> UsageEntry? {
-        // Check for required standard schema structure
-        guard let timestampString = json["timestamp"] as? String,
-              let message = json["message"] as? [String: Any],
-              let usage = message["usage"] as? [String: Any],
-              let inputTokens = usage["input_tokens"] as? Int,
-              let outputTokens = usage["output_tokens"] as? Int else {
             return nil
         }
-        
-        // Parse timestamp with fractional seconds support
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let timestamp = formatter.date(from: timestampString) ?? ISO8601DateFormatter().date(from: timestampString) else {
-            return nil
-        }
-        
-        // Extract optional fields
-        let model = message["model"] as? String ?? "unknown"
-        let messageId = message["id"] as? String
-        let requestId = json["requestId"] as? String
-        let costUSD = json["costUSD"] as? Double
-        _ = json["version"] as? String
-        
-        // Extract cache tokens
-        let cacheCreationTokens = usage["cache_creation_input_tokens"] as? Int ?? 0
-        let cacheReadTokens = usage["cache_read_input_tokens"] as? Int ?? 0
-        let totalCachedTokens = cacheCreationTokens + cacheReadTokens
-        
-        let tokenCounts = TokenCounts(
-            input: inputTokens,
-            output: outputTokens,
-            cached: totalCachedTokens > 0 ? totalCachedTokens : nil
-        )
-        
-        // Generate ID - use messageId if available, otherwise create from timestamp
-        let id = messageId ?? UUID().uuidString
-        
-        return UsageEntry(
-            id: id,
-            timestamp: timestamp,
-            model: model,
-            tokenCounts: tokenCounts,
-            cost: costUSD,
-            sessionId: nil, // Not available in standard format
-            projectPath: nil, // Will be extracted from file path
-            requestId: requestId,
-            messageId: messageId
-        )
     }
     
-    /// Check if data represents a Claude log entry
-    private func isClaudeLogEntry(data: Data) -> Bool {
-        do {
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let type = json["type"] as? String {
-                return ["assistant", "user", "summary"].contains(type)
-            }
-        } catch {
-            // Not valid JSON
-        }
-        return false
-    }
-    
-    /// Log parsing errors for debugging
-    private func logParsingError(_ message: String, lineNumber: Int, line: String) {
-        let truncatedLine = line.count > 100 ? String(line.prefix(100)) + "..." : line
-        Logger.parser.error("⚠️ JSONL Parse Error (line \(lineNumber)): \(message)")
-        Logger.parser.debug("   Line content: \(truncatedLine, privacy: .private)")
-    }
     
     /// Clear deduplication cache
     func clearDeduplicationCache() {

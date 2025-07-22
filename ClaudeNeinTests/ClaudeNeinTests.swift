@@ -21,7 +21,7 @@ struct ClaudeNeinTests {
         
         let tokens2 = TokenCounts(input: 100, output: 200, cacheCreation: nil, cacheRead: nil)
         #expect(tokens2.total == 300)
-        #expect(tokens2.cached == 0)
+        #expect(tokens2.cached == nil)
     }
     
     @Test func testUsageEntryEquality() {
@@ -119,15 +119,15 @@ struct JSONLParserTests {
         
         // Test entries with same request and message IDs (should be deduplicated)
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}, "requestId": "req-123", "messageId": "msg-456"}
-        {"id": "test-2", "timestamp": "2024-07-21T10:01:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 150, "output_tokens": 250}, "requestId": "req-123", "messageId": "msg-456"}
-        {"id": "test-3", "timestamp": "2024-07-21T10:02:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}, "requestId": "req-789", "messageId": "msg-101"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:00:00Z", "message": {"model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}, "requestId": "req-123", "messageId": "msg-456"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:01:00Z", "message": {"model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 150, "output_tokens": 250}}, "requestId": "req-123", "messageId": "msg-456"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:02:00Z", "message": {"model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}, "requestId": "req-789", "messageId": "msg-101"}
         """
         
         let entriesWithDedup = parser.parseJSONLContent(jsonlContent, enableDeduplication: true)
         #expect(entriesWithDedup.count == 2) // Should deduplicate first two entries
-        #expect(entriesWithDedup[0].id == "test-1")
-        #expect(entriesWithDedup[1].id == "test-3")
+        #expect(entriesWithDedup[0].requestId == "req-123")
+        #expect(entriesWithDedup[1].requestId == "req-789")
         
         // Clear cache and test without deduplication
         parser.clearDeduplicationCache()
@@ -421,8 +421,8 @@ struct PricingManagerTests {
         
         let calculatedCost = pricingManager.calculateCost(for: entryWithHighCost, mode: .calculate)
         
-        // Expected: (1M * 3.0 + 1M * 15.0 + 1M * 0.3) / 1M = 18.3
-        let expectedCost = 3.0 + 15.0 + 0.3
+        // Expected: (1M * 3.0 + 1M * 15.0 + 500K * 3.75/1M + 500K * 0.3/1M) = 20.025
+        let expectedCost = 3.0 + 15.0 + 1.875 + 0.15
         #expect(abs(calculatedCost - expectedCost) < 0.001)
     }
     
@@ -475,8 +475,8 @@ struct PricingManagerTests {
         
         let calculatedCost = pricingManager.calculateCost(for: entry)
         
-        // Expected: (1M * 3.0 + 1M * 15.0 + 1M * 0.3) / 1M = 18.3
-        let expectedCost = 3.0 + 15.0 + 0.3
+        // Expected: (1M * 3.0 + 1M * 15.0 + 500K * 3.75/1M + 500K * 0.3/1M) = 20.025
+        let expectedCost = 3.0 + 15.0 + 1.875 + 0.15
         #expect(abs(calculatedCost - expectedCost) < 0.001)
     }
     
@@ -523,8 +523,8 @@ struct PricingManagerTests {
         
         let totalCost = pricingManager.calculateTotalCost(for: [entry1, entry2])
         
-        // Expected: 3.0 (Sonnet input) + 0.25 (Haiku input) = 3.25
-        let expectedCost = 3.0 + 0.25
+        // Expected: 3.0 (Sonnet input) + 0.8 (Haiku input) = 3.8
+        let expectedCost = 3.0 + 0.8
         #expect(abs(totalCost - expectedCost) < 0.001)
     }
 }

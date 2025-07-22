@@ -26,12 +26,14 @@ class LiteLLMParser {
             
             if let inputPrice = modelConfig["input_cost_per_token"] as? Double,
                let outputPrice = modelConfig["output_cost_per_token"] as? Double {
-                let cachedPrice = modelConfig["cache_read_input_token_cost"] as? Double
+                let cacheCreationPrice = modelConfig["cache_creation_input_token_cost"] as? Double
+                let cacheReadPrice = modelConfig["cache_read_input_token_cost"] as? Double
                 
                 models[modelName] = ModelPrice(
                     inputPrice: inputPrice * 1_000_000, // Convert to per-million
                     outputPrice: outputPrice * 1_000_000,
-                    cachedPrice: cachedPrice != nil ? cachedPrice! * 1_000_000 : nil
+                    cacheCreationPrice: cacheCreationPrice != nil ? cacheCreationPrice! * 1_000_000 : nil,
+                    cacheReadPrice: cacheReadPrice != nil ? cacheReadPrice! * 1_000_000 : nil
                 )
             }
         }

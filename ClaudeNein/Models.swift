@@ -230,22 +230,40 @@ struct UsageEntry: Codable, Equatable, Hashable {
 struct TokenCounts: Codable, Equatable {
     let input: Int
     let output: Int
-    let cached: Int?
+    let cacheCreation: Int?
+    let cacheRead: Int?
     
     enum CodingKeys: String, CodingKey {
         case input = "input_tokens"
         case output = "output_tokens"
-        case cached = "cached_tokens"
+        case cacheCreation = "cache_creation_tokens"
+        case cacheRead = "cache_read_tokens"
     }
     
+    /// Total cached tokens (creation + read)
+    var cached: Int? {
+        guard cacheCreation != nil || cacheRead != nil else { return nil }
+        return (cacheCreation ?? 0) + (cacheRead ?? 0)
+    }
+    
+    /// Total tokens including all types
     var total: Int {
         return input + output + (cached ?? 0)
     }
     
+    init(input: Int, output: Int, cacheCreation: Int? = nil, cacheRead: Int? = nil) {
+        self.input = input
+        self.output = output
+        self.cacheCreation = cacheCreation
+        self.cacheRead = cacheRead
+    }
+    
+    /// Legacy convenience initializer for backward compatibility
     init(input: Int, output: Int, cached: Int? = nil) {
         self.input = input
         self.output = output
-        self.cached = cached
+        self.cacheCreation = cached
+        self.cacheRead = nil
     }
 }
 
@@ -265,12 +283,14 @@ struct SessionBlock: Equatable {
         // Aggregate token counts
         let inputSum = entries.reduce(0) { $0 + $1.tokenCounts.input }
         let outputSum = entries.reduce(0) { $0 + $1.tokenCounts.output }
-        let cachedSum = entries.reduce(0) { $0 + ($1.tokenCounts.cached ?? 0) }
+        let cacheCreationSum = entries.reduce(0) { $0 + ($1.tokenCounts.cacheCreation ?? 0) }
+        let cacheReadSum = entries.reduce(0) { $0 + ($1.tokenCounts.cacheRead ?? 0) }
         
         self.totalTokens = TokenCounts(
             input: inputSum,
             output: outputSum,
-            cached: cachedSum > 0 ? cachedSum : nil
+            cacheCreation: cacheCreationSum > 0 ? cacheCreationSum : nil,
+            cacheRead: cacheReadSum > 0 ? cacheReadSum : nil
         )
         
         // Aggregate costs

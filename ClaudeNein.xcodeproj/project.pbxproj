@@ -14,19 +14,13 @@
 			remoteGlobalIDString = 1044BE4A2E2E6A9100CF5877;
 			remoteInfo = ClaudeNein;
 		};
-		1044BE642E2E6A9200CF5877 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 1044BE432E2E6A9100CF5877 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 1044BE4A2E2E6A9100CF5877;
-			remoteInfo = ClaudeNein;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		1044BE4B2E2E6A9100CF5877 /* ClaudeNein.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeNein.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1044BE592E2E6A9200CF5877 /* ClaudeNeinTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeNeinTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		1044BE632E2E6A9200CF5877 /* ClaudeNeinUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeNeinUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		10597F4D2E301B40009E7728 /* ClaudeNein.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = ClaudeNein.xctestplan; sourceTree = "<group>"; };
+		10CE64E02E301AFF000579D0 /* ClaudeNein.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = ClaudeNein.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -38,11 +32,6 @@
 		1044BE5C2E2E6A9200CF5877 /* ClaudeNeinTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ClaudeNeinTests;
-			sourceTree = "<group>";
-		};
-		1044BE662E2E6A9200CF5877 /* ClaudeNeinUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = ClaudeNeinUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -62,22 +51,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		1044BE602E2E6A9200CF5877 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		1044BE422E2E6A9100CF5877 = {
 			isa = PBXGroup;
 			children = (
+				10597F4D2E301B40009E7728 /* ClaudeNein.xctestplan */,
+				10CE64E02E301AFF000579D0 /* ClaudeNein.xctestplan */,
 				1044BE4D2E2E6A9100CF5877 /* ClaudeNein */,
 				1044BE5C2E2E6A9200CF5877 /* ClaudeNeinTests */,
-				1044BE662E2E6A9200CF5877 /* ClaudeNeinUITests */,
 				1044BE4C2E2E6A9100CF5877 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -87,7 +70,6 @@
 			children = (
 				1044BE4B2E2E6A9100CF5877 /* ClaudeNein.app */,
 				1044BE592E2E6A9200CF5877 /* ClaudeNeinTests.xctest */,
-				1044BE632E2E6A9200CF5877 /* ClaudeNeinUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,29 +123,6 @@
 			productReference = 1044BE592E2E6A9200CF5877 /* ClaudeNeinTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		1044BE622E2E6A9200CF5877 /* ClaudeNeinUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 1044BE732E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNeinUITests" */;
-			buildPhases = (
-				1044BE5F2E2E6A9200CF5877 /* Sources */,
-				1044BE602E2E6A9200CF5877 /* Frameworks */,
-				1044BE612E2E6A9200CF5877 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				1044BE652E2E6A9200CF5877 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				1044BE662E2E6A9200CF5877 /* ClaudeNeinUITests */,
-			);
-			name = ClaudeNeinUITests;
-			packageProductDependencies = (
-			);
-			productName = ClaudeNeinUITests;
-			productReference = 1044BE632E2E6A9200CF5877 /* ClaudeNeinUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -179,10 +138,6 @@
 					};
 					1044BE582E2E6A9200CF5877 = {
 						CreatedOnToolsVersion = 16.4;
-					};
-					1044BE622E2E6A9200CF5877 = {
-						CreatedOnToolsVersion = 16.4;
-						TestTargetID = 1044BE4A2E2E6A9100CF5877;
 					};
 				};
 			};
@@ -202,7 +157,6 @@
 			targets = (
 				1044BE4A2E2E6A9100CF5877 /* ClaudeNein */,
 				1044BE582E2E6A9200CF5877 /* ClaudeNeinTests */,
-				1044BE622E2E6A9200CF5877 /* ClaudeNeinUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -216,13 +170,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		1044BE572E2E6A9200CF5877 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		1044BE612E2E6A9200CF5877 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -246,13 +193,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		1044BE5F2E2E6A9200CF5877 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -260,11 +200,6 @@
 			isa = PBXTargetDependency;
 			target = 1044BE4A2E2E6A9100CF5877 /* ClaudeNein */;
 			targetProxy = 1044BE5A2E2E6A9200CF5877 /* PBXContainerItemProxy */;
-		};
-		1044BE652E2E6A9200CF5877 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 1044BE4A2E2E6A9100CF5877 /* ClaudeNein */;
-			targetProxy = 1044BE642E2E6A9200CF5877 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -477,38 +412,6 @@
 			};
 			name = Release;
 		};
-		1044BE742E2E6A9200CF5877 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = BSCHQJ3CR8;
-				INFOPLIST_FILE = ClaudeNein/Info.plist;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNeinUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = ClaudeNein;
-			};
-			name = Debug;
-		};
-		1044BE752E2E6A9200CF5877 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = BSCHQJ3CR8;
-				INFOPLIST_FILE = ClaudeNein/Info.plist;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = me.forketyfork.ClaudeNeinUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = ClaudeNein;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -535,15 +438,6 @@
 			buildConfigurations = (
 				1044BE712E2E6A9200CF5877 /* Debug */,
 				1044BE722E2E6A9200CF5877 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		1044BE732E2E6A9200CF5877 /* Build configuration list for PBXNativeTarget "ClaudeNeinUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1044BE742E2E6A9200CF5877 /* Debug */,
-				1044BE752E2E6A9200CF5877 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

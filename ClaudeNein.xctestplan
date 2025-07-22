@@ -1,0 +1,29 @@
+{
+  "configurations" : [
+    {
+      "id" : "179CA31F-53F5-4479-B64D-27660C95592D",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:ClaudeNein.xcodeproj",
+      "identifier" : "1044BE4A2E2E6A9100CF5877",
+      "name" : "ClaudeNein"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:ClaudeNein.xcodeproj",
+        "identifier" : "1044BE582E2E6A9200CF5877",
+        "name" : "ClaudeNeinTests"
+      }
+    }
+  ],
+  "version" : 1
+}

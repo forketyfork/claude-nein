@@ -85,7 +85,7 @@ class PricingManager {
         }
     }
     
-    /// Calculate cost from token counts
+    /// Calculate cost from token counts with separate cache pricing
     private func calculateCostFromTokens(for entry: UsageEntry) -> Double {
         let pricing = getCurrentPricing()
         guard let modelPricing = pricing.models[entry.model] else {
@@ -96,9 +96,12 @@ class PricingManager {
         
         let inputCost = Double(entry.tokenCounts.input) * modelPricing.inputPrice / 1_000_000
         let outputCost = Double(entry.tokenCounts.output) * modelPricing.outputPrice / 1_000_000
-        let cachedCost = Double(entry.tokenCounts.cached ?? 0) * (modelPricing.cachedPrice ?? 0) / 1_000_000
         
-        return inputCost + outputCost + cachedCost
+        // Calculate cache costs separately
+        let cacheCreationCost = Double(entry.tokenCounts.cacheCreation ?? 0) * (modelPricing.cacheCreationPrice ?? 0) / 1_000_000
+        let cacheReadCost = Double(entry.tokenCounts.cacheRead ?? 0) * (modelPricing.cacheReadPrice ?? 0) / 1_000_000
+        
+        return inputCost + outputCost + cacheCreationCost + cacheReadCost
     }
     
     /// Calculate costs for multiple entries with cost mode support
@@ -149,15 +152,16 @@ class PricingManager {
         Logger.calculator.debug("📦 Loading bundled pricing data")
         
         // Bundled fallback pricing for common Claude models
+        // Based on official Anthropic pricing as of 2025
         let models = [
-            "claude-3-5-sonnet-20241022": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cachedPrice: 0.3),
-            "claude-3-5-sonnet-20240620": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cachedPrice: 0.3),
-            "claude-3-5-haiku-20241022": ModelPrice(inputPrice: 0.25, outputPrice: 1.25, cachedPrice: 0.03),
-            "claude-3-opus-20240229": ModelPrice(inputPrice: 15.0, outputPrice: 75.0, cachedPrice: 1.5),
-            "claude-3-sonnet-20240229": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cachedPrice: 0.3),
-            "claude-3-haiku-20240307": ModelPrice(inputPrice: 0.25, outputPrice: 1.25, cachedPrice: 0.03),
-            "claude-sonnet-4-20250514": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cachedPrice: 0.3),
-            "claude-opus-4-20250514": ModelPrice(inputPrice: 15.0, outputPrice: 75.0, cachedPrice: 1.5)
+            "claude-3-5-sonnet-20241022": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cacheCreationPrice: 3.75, cacheReadPrice: 0.3),
+            "claude-3-5-sonnet-20240620": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cacheCreationPrice: 3.75, cacheReadPrice: 0.3),
+            "claude-3-5-haiku-20241022": ModelPrice(inputPrice: 0.8, outputPrice: 4.0, cacheCreationPrice: 1.0, cacheReadPrice: 0.08),
+            "claude-3-opus-20240229": ModelPrice(inputPrice: 15.0, outputPrice: 75.0, cacheCreationPrice: 18.75, cacheReadPrice: 1.5),
+            "claude-3-sonnet-20240229": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cacheCreationPrice: 3.75, cacheReadPrice: 0.3),
+            "claude-3-haiku-20240307": ModelPrice(inputPrice: 0.25, outputPrice: 1.25, cacheCreationPrice: 0.3, cacheReadPrice: 0.03),
+            "claude-sonnet-4-20250514": ModelPrice(inputPrice: 3.0, outputPrice: 15.0, cacheCreationPrice: 3.75, cacheReadPrice: 0.3),
+            "claude-opus-4-20250514": ModelPrice(inputPrice: 15.0, outputPrice: 75.0, cacheCreationPrice: 18.75, cacheReadPrice: 1.5)
         ]
         
         Logger.calculator.debug("📦 Loaded bundled data for \(models.count) models")
@@ -216,9 +220,31 @@ struct ModelPricing: Codable {
 }
 
 struct ModelPrice: Codable {
-    let inputPrice: Double    // Price per million tokens
-    let outputPrice: Double   // Price per million tokens
-    let cachedPrice: Double?  // Price per million cached tokens
+    let inputPrice: Double           // Price per million tokens
+    let outputPrice: Double          // Price per million tokens
+    let cacheCreationPrice: Double?  // Price per million cache creation tokens
+    let cacheReadPrice: Double?      // Price per million cache read tokens
+    
+    /// Legacy cached price for backward compatibility (uses cache read price)
+    var cachedPrice: Double? {
+        return cacheReadPrice
+    }
+    
+    /// Convenience initializer with legacy cached price
+    init(inputPrice: Double, outputPrice: Double, cachedPrice: Double?) {
+        self.inputPrice = inputPrice
+        self.outputPrice = outputPrice
+        self.cacheCreationPrice = cachedPrice
+        self.cacheReadPrice = cachedPrice
+    }
+    
+    /// Full initializer with separate cache prices
+    init(inputPrice: Double, outputPrice: Double, cacheCreationPrice: Double?, cacheReadPrice: Double?) {
+        self.inputPrice = inputPrice
+        self.outputPrice = outputPrice
+        self.cacheCreationPrice = cacheCreationPrice
+        self.cacheReadPrice = cacheReadPrice
+    }
 }
 
 // MARK: - Data Source Tracking
