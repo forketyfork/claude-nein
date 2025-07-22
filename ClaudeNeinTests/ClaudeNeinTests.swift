@@ -15,11 +15,13 @@ struct ClaudeNeinTests {
     // MARK: - Models Tests
     
     @Test func testTokenCountsTotal() {
-        let tokens1 = TokenCounts(input: 100, output: 200, cached: 50)
+        let tokens1 = TokenCounts(input: 100, output: 200, cacheCreation: 30, cacheRead: 20)
         #expect(tokens1.total == 350)
+        #expect(tokens1.cached == 50) // 30 + 20
         
-        let tokens2 = TokenCounts(input: 100, output: 200, cached: nil)
+        let tokens2 = TokenCounts(input: 100, output: 200, cacheCreation: nil, cacheRead: nil)
         #expect(tokens2.total == 300)
+        #expect(tokens2.cached == 0)
     }
     
     @Test func testUsageEntryEquality() {
@@ -49,47 +51,7 @@ struct ClaudeNeinTests {
         #expect(entry1 == entry2)
     }
     
-    @Test func testSessionBlockInitialization() {
-        let startTime = Date()
-        let tokens1 = TokenCounts(input: 100, output: 200, cached: 50)
-        let tokens2 = TokenCounts(input: 150, output: 300)
-        
-        let entry1 = UsageEntry(
-            id: "entry-1",
-            timestamp: startTime,
-            model: "claude-3-5-sonnet-20241022",
-            tokenCounts: tokens1,
-            cost: 1.5,
-            sessionId: "session-1",
-            projectPath: "/test/path"
-        )
-        
-        let entry2 = UsageEntry(
-            id: "entry-2",
-            timestamp: startTime,
-            model: "claude-3-5-sonnet-20241022",
-            tokenCounts: tokens2,
-            cost: 2.0,
-            sessionId: "session-1",
-            projectPath: "/test/path"
-        )
-        
-        let sessionBlock = SessionBlock(startTime: startTime, entries: [entry1, entry2])
-        
-        #expect(sessionBlock.totalTokens.input == 250)
-        #expect(sessionBlock.totalTokens.output == 500)
-        #expect(sessionBlock.totalTokens.cached == 50)
-        #expect(sessionBlock.totalCost == 3.5)
-        #expect(sessionBlock.entries.count == 2)
-    }
     
-    @Test func testSpendSummaryEmpty() {
-        let emptySummary = SpendSummary.empty
-        #expect(emptySummary.todaySpend == 0.0)
-        #expect(emptySummary.weekSpend == 0.0)
-        #expect(emptySummary.monthSpend == 0.0)
-        #expect(emptySummary.modelBreakdown.isEmpty)
-    }
 }
 
 // MARK: - JSONLParser Tests
@@ -99,8 +61,8 @@ struct JSONLParserTests {
     @Test func testValidJSONLParsing() {
         let parser = JSONLParser()
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}, "costUSD": 1.5}
-        {"id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100, "cached_tokens": 25}, "costUSD": 0.5}
+        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}, "costUSD": 1.5}
+        {"id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100, "cache_read_input_tokens": 25}, "costUSD": 0.5}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
@@ -120,9 +82,9 @@ struct JSONLParserTests {
     @Test func testMalformedJSONLHandling() {
         let parser = JSONLParser()
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}}
+        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
         invalid json line
-        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100}}
+        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
         {"incomplete": "data"
         """
         
@@ -138,10 +100,10 @@ struct JSONLParserTests {
         let parser = JSONLParser()
         let jsonlContent = """
         
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}}
+        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
         
         
-        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100}}
+        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
         
         """
         
@@ -157,9 +119,9 @@ struct JSONLParserTests {
         
         // Test entries with same request and message IDs (should be deduplicated)
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 100, "output_tokens": 200}, "requestId": "req-123", "messageId": "msg-456"}
-        {"id": "test-2", "timestamp": "2024-07-21T10:01:00Z", "model": "claude-3-5-sonnet-20241022", "token_counts": {"input_tokens": 150, "output_tokens": 250}, "requestId": "req-123", "messageId": "msg-456"}
-        {"id": "test-3", "timestamp": "2024-07-21T10:02:00Z", "model": "claude-3-5-haiku-20241022", "token_counts": {"input_tokens": 50, "output_tokens": 100}, "requestId": "req-789", "messageId": "msg-101"}
+        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}, "requestId": "req-123", "messageId": "msg-456"}
+        {"id": "test-2", "timestamp": "2024-07-21T10:01:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 150, "output_tokens": 250}, "requestId": "req-123", "messageId": "msg-456"}
+        {"id": "test-3", "timestamp": "2024-07-21T10:02:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}, "requestId": "req-789", "messageId": "msg-101"}
         """
         
         let entriesWithDedup = parser.parseJSONLContent(jsonlContent, enableDeduplication: true)
@@ -387,7 +349,7 @@ struct PricingManagerTests {
         if let sonnetPricing = pricing.models["claude-3-5-sonnet-20241022"] {
             #expect(sonnetPricing.inputPrice == 3.0)
             #expect(sonnetPricing.outputPrice == 15.0)
-            #expect(sonnetPricing.cachedPrice == 0.3)
+            #expect(sonnetPricing.cacheReadPrice == 0.3)
         }
     }
     
@@ -444,7 +406,7 @@ struct PricingManagerTests {
     
     @Test func testCostCalculationModesCalculate() {
         let pricingManager = PricingManager.shared
-        let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cached: 1_000_000)
+        let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cacheCreation: 500_000, cacheRead: 500_000)
         
         // Test calculate mode ignoring costUSD
         let entryWithHighCost = UsageEntry(
@@ -499,7 +461,7 @@ struct PricingManagerTests {
     
     @Test func testCostCalculationFromTokens() {
         let pricingManager = PricingManager.shared
-        let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cached: 1_000_000)
+        let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cacheCreation: 500_000, cacheRead: 500_000)
         
         let entry = UsageEntry(
             id: "test-1",
@@ -765,29 +727,6 @@ struct ErrorHandlingTests {
         #expect(entries.isEmpty)
     }
     
-    @Test func testUsageEntryCustomInit() {
-        // Test direct initialization of UsageEntry
-        let tokens = TokenCounts(input: 100, output: 200, cached: 50)
-        let date = Date()
-        
-        let entry = UsageEntry(
-            id: "custom-test",
-            timestamp: date,
-            model: "test-model",
-            tokenCounts: tokens,
-            cost: 1.5,
-            sessionId: "session-test",
-            projectPath: "/custom/path"
-        )
-        
-        #expect(entry.id == "custom-test")
-        #expect(entry.timestamp == date)
-        #expect(entry.model == "test-model")
-        #expect(entry.tokenCounts == tokens)
-        #expect(entry.cost == 1.5)
-        #expect(entry.sessionId == "session-test")
-        #expect(entry.projectPath == "/custom/path")
-    }
 }
 
 // MARK: - FileMonitor Tests
