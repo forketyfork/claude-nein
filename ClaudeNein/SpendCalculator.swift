@@ -108,6 +108,7 @@ extension SpendSummary {
     func formatSpend(_ amount: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "en_US")
         formatter.currencyCode = "USD"
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 4
