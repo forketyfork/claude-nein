@@ -33,7 +33,16 @@ class MenuBarManager: ObservableObject {
         Logger.app.info("🚀 Initializing ClaudeNein MenuBarManager")
         setupMenuBar()
         setupFileMonitoring()
+        initializePricingData()
         Logger.app.info("✅ ClaudeNein MenuBarManager initialized successfully")
+    }
+    
+    private func initializePricingData() {
+        Logger.app.debug("💰 Starting pricing data initialization")
+        Task {
+            await PricingManager.shared.initializePricingData()
+            Logger.app.info("💰 Pricing data initialization completed")
+        }
     }
     
     deinit {
@@ -145,6 +154,12 @@ class MenuBarManager: ObservableObject {
         let lastUpdated = NSMenuItem(title: "Updated: \(formatTime(currentSummary.lastUpdated))", action: nil, keyEquivalent: "")
         lastUpdated.isEnabled = false
         menu.addItem(lastUpdated)
+        
+        // Add pricing data source information
+        let dataSource = PricingManager.shared.getCurrentDataSource()
+        let dataSourceItem = NSMenuItem(title: "Pricing: \(dataSource.description)", action: nil, keyEquivalent: "")
+        dataSourceItem.isEnabled = false
+        menu.addItem(dataSourceItem)
         
         menu.addItem(NSMenuItem.separator())
         
