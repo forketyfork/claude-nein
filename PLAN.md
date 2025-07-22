@@ -45,7 +45,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Support pre-calculated costs from JSONL when available
 - [x] Create spend aggregation functions:
   - [x] Daily spend calculation
-  - [x] Weekly spend calculation (last 7 days)
+  - [x] Weekly spend calculation (current calendar week)
   - [x] Monthly spend calculation (current calendar month)
 
 ### Phase 4: File Monitoring System

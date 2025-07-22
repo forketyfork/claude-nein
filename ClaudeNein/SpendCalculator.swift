@@ -13,7 +13,7 @@ class SpendCalculator {
         
         // Filter entries by time periods
         let todayEntries = filterEntriesToday(entries, referenceDate: now)
-        let weekEntries = filterEntriesLastWeek(entries, referenceDate: now)
+        let weekEntries = filterEntriesThisWeek(entries, referenceDate: now)
         let monthEntries = filterEntriesThisMonth(entries, referenceDate: now)
         
         Logger.calculator.debug("📊 Filtered entries - Today: \(todayEntries.count), Week: \(weekEntries.count), Month: \(monthEntries.count)")
@@ -80,14 +80,14 @@ class SpendCalculator {
         }
     }
     
-    /// Filter entries for the last 7 days (not including today)
-    private func filterEntriesLastWeek(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
-        guard let weekAgo = calendar.date(byAdding: .day, value: -7, to: referenceDate) else {
+    /// Filter entries for the current calendar week starting from the locale's first weekday
+    private func filterEntriesThisWeek(_ entries: [UsageEntry], referenceDate: Date) -> [UsageEntry] {
+        guard let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: referenceDate)?.start else {
             return []
         }
-        
+
         return entries.filter { entry in
-            entry.timestamp >= weekAgo && entry.timestamp <= referenceDate
+            entry.timestamp >= startOfWeek && entry.timestamp <= referenceDate
         }
     }
     
