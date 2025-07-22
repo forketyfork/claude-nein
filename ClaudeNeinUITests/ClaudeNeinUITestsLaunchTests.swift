@@ -29,5 +29,7 @@ final class ClaudeNeinUITestsLaunchTests: XCTestCase {
         attachment.name = "Launch Screen"
         attachment.lifetime = .keepAlways
         add(attachment)
+        
+        XCTAssertTrue(app.exists)
     }
 }

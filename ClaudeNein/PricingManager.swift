@@ -164,9 +164,6 @@ struct ModelPrice: Codable {
     let cachedPrice: Double?  // Price per million cached tokens
 }
 
-// MARK: - API Response Types
-// Removed LiteLLMPricingResponse typealias since we handle JSON manually
-
 // MARK: - Errors
 
 enum PricingError: Error {
