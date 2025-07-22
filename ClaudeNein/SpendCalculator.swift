@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Handles spend aggregation for different time periods
 class SpendCalculator {
@@ -7,12 +8,15 @@ class SpendCalculator {
     
     /// Calculate spending summary from usage entries
     func calculateSpendSummary(from entries: [UsageEntry]) -> SpendSummary {
+        Logger.calculator.debug("🔢 Calculating spend summary from \(entries.count) entries")
         let now = Date()
         
         // Filter entries by time periods
         let todayEntries = filterEntriesToday(entries, referenceDate: now)
         let weekEntries = filterEntriesLastWeek(entries, referenceDate: now)
         let monthEntries = filterEntriesThisMonth(entries, referenceDate: now)
+        
+        Logger.calculator.debug("📊 Filtered entries - Today: \(todayEntries.count), Week: \(weekEntries.count), Month: \(monthEntries.count)")
         
         // Calculate costs for each period
         let todaySpend = pricingManager.calculateTotalCost(for: todayEntries)
@@ -21,6 +25,8 @@ class SpendCalculator {
         
         // Calculate model breakdown for the month
         let modelBreakdown = calculateModelBreakdown(from: monthEntries)
+        
+        Logger.calculator.info("💰 Spend summary - Today: $\(String(format: "%.4f", todaySpend)), Week: $\(String(format: "%.4f", weekSpend)), Month: $\(String(format: "%.4f", monthSpend))")
         
         return SpendSummary(
             todaySpend: todaySpend,

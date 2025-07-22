@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Handles reading and parsing Claude Code JSONL files
 class JSONLParser {
@@ -22,8 +23,11 @@ class JSONLParser {
     
     /// Parse a JSONL file and return valid usage entries
     func parseJSONLFile(at url: URL) throws -> [UsageEntry] {
+        Logger.parser.debug("📖 Reading JSONL file: \(url.lastPathComponent)")
         let content = try String(contentsOf: url, encoding: .utf8)
-        return parseJSONLContent(content)
+        let entries = parseJSONLContent(content)
+        Logger.parser.logDataProcessing("JSONL parsing", count: entries.count)
+        return entries
     }
     
     /// Parse JSONL content string and return valid usage entries
@@ -79,12 +83,13 @@ class JSONLParser {
     /// Log parsing errors for debugging
     private func logParsingError(_ message: String, lineNumber: Int, line: String) {
         let truncatedLine = line.count > 100 ? String(line.prefix(100)) + "..." : line
-        print("⚠️ JSONL Parse Error (line \(lineNumber)): \(message)")
-        print("   Line content: \(truncatedLine)")
+        Logger.parser.error("⚠️ JSONL Parse Error (line \(lineNumber)): \(message)")
+        Logger.parser.debug("   Line content: \(truncatedLine, privacy: .private)")
     }
     
     /// Discover Claude config directories on the system
     static func findClaudeConfigDirectories() -> [URL] {
+        Logger.parser.debug("🔍 Searching for Claude config directories")
         var directories: [URL] = []
         let fileManager = FileManager.default
         
@@ -94,10 +99,12 @@ class JSONLParser {
         let configClaudeDir = homeDirectory.appendingPathComponent(".config/claude/projects")
         
         if fileManager.fileExists(atPath: claudeDir.path) {
+            Logger.parser.debug("📁 Found standard Claude directory: \(claudeDir.path, privacy: .private)")
             directories.append(claudeDir)
         }
         
         if fileManager.fileExists(atPath: configClaudeDir.path) {
+            Logger.parser.debug("📁 Found config Claude directory: \(configClaudeDir.path, privacy: .private)")
             directories.append(configClaudeDir)
         }
         
@@ -105,15 +112,18 @@ class JSONLParser {
         if let customPath = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"] {
             let customURL = URL(fileURLWithPath: customPath)
             if fileManager.fileExists(atPath: customURL.path) {
+                Logger.parser.debug("📁 Found custom Claude directory from env: \(customURL.path, privacy: .private)")
                 directories.append(customURL)
             }
         }
         
+        Logger.parser.info("📁 Found \(directories.count) Claude config directories")
         return directories
     }
     
     /// Recursively discover all JSONL files in given directories
     static func discoverJSONLFiles(in directories: [URL]) -> [URL] {
+        Logger.parser.debug("🔍 Discovering JSONL files in \(directories.count) directories")
         let fileManager = FileManager.default
         var jsonlFiles: [URL] = []
         
@@ -123,10 +133,11 @@ class JSONLParser {
                 includingPropertiesForKeys: [.isRegularFileKey],
                 options: [.skipsHiddenFiles],
                 errorHandler: { (url, error) in
-                    print("⚠️ Error accessing \(url): \(error.localizedDescription)")
+                    Logger.parser.error("⚠️ Error accessing \(url.path, privacy: .private): \(error.localizedDescription)")
                     return true
                 }
             ) else {
+                Logger.parser.error("❌ Could not create enumerator for directory: \(directory.path, privacy: .private)")
                 continue
             }
             
@@ -135,13 +146,15 @@ class JSONLParser {
                     let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
                     if resourceValues.isRegularFile == true && fileURL.pathExtension == "jsonl" {
                         jsonlFiles.append(fileURL)
+                        Logger.parser.debug("📄 Found JSONL file: \(fileURL.lastPathComponent)")
                     }
                 } catch {
-                    print("⚠️ Error checking file \(fileURL): \(error.localizedDescription)")
+                    Logger.parser.error("⚠️ Error checking file \(fileURL.lastPathComponent): \(error.localizedDescription)")
                 }
             }
         }
         
+        Logger.parser.info("📄 Discovered \(jsonlFiles.count) JSONL files")
         return jsonlFiles.sorted { $0.path < $1.path }
     }
 }

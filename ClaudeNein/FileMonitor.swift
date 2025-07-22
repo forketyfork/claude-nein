@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import OSLog
 
 /// Monitors Claude config directories for file changes and provides real-time updates
 class FileMonitor: ObservableObject {
@@ -29,19 +30,19 @@ class FileMonitor: ObservableObject {
             
             switch nsError.code {
             case NSFileReadNoPermissionError:
-                print("🚫 Permission denied: \(path)")
+                Logger.security.error("🚫 Permission denied: \(path, privacy: .private)")
             case NSFileReadNoSuchFileError:
-                print("❓ File not found: \(path)")
+                Logger.fileMonitor.notice("❓ File not found: \(path, privacy: .private)")
             case NSFileReadCorruptFileError:
-                print("💥 Corrupted file: \(path)")
+                Logger.fileMonitor.error("💥 Corrupted file: \(path, privacy: .private)")
             default:
                 // Check for disk full
                 if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
-                    print("💾 Disk full - cannot process: \(path)")
+                    Logger.fileMonitor.fault("💾 Disk full - cannot process: \(path, privacy: .private)")
                 } else if path.hasPrefix("/Volumes/") || path.hasPrefix("//") {
-                    print("🌐 Network file system error: \(path)")
+                    Logger.network.error("🌐 Network file system error: \(path, privacy: .private)")
                 } else {
-                    print("⚠️ Failed to get file attributes for \(path): \(error.localizedDescription)")
+                    Logger.fileMonitor.error("⚠️ Failed to get file attributes for \(path, privacy: .private): \(error.localizedDescription)")
                 }
             }
         }
@@ -174,15 +175,20 @@ class FileMonitor: ObservableObject {
     // MARK: - Private Methods
     
     private func setupMonitoring() {
+        Logger.fileMonitor.debug("🔧 Setting up file monitoring")
+        
         // Find Claude directories
         monitoredDirectories = JSONLParser.findClaudeConfigDirectories()
         
         guard !monitoredDirectories.isEmpty else {
-            print("⚠️ No Claude config directories found for monitoring")
+            Logger.fileMonitor.error("⚠️ No Claude config directories found for monitoring")
             return
         }
         
-        print("📁 Monitoring directories: \(monitoredDirectories.map { $0.path })")
+        Logger.fileMonitor.info("📁 Monitoring \(self.monitoredDirectories.count) directories")
+        for directory in self.monitoredDirectories {
+            Logger.fileMonitor.debug("📂 Monitoring: \(directory.path, privacy: .private)")
+        }
         
         // Set up directory watchers
         setupDirectoryWatchers()
@@ -195,14 +201,18 @@ class FileMonitor: ObservableObject {
         
         DispatchQueue.main.async { [weak self] in
             self?.isMonitoring = true
+            Logger.fileMonitor.info("✅ File monitoring is now active")
         }
     }
     
     private func teardownMonitoring() {
+        Logger.fileMonitor.debug("🛑 Tearing down file monitoring")
+        
         // Stop directory watchers
         for watcher in directoryWatchers {
             watcher.cancel()
         }
+        Logger.fileMonitor.debug("📂 Cancelled \(self.directoryWatchers.count) directory watchers")
         directoryWatchers.removeAll()
         
         // Stop timers
@@ -214,6 +224,7 @@ class FileMonitor: ObservableObject {
         
         DispatchQueue.main.async { [weak self] in
             self?.isMonitoring = false
+            Logger.fileMonitor.info("✅ File monitoring stopped")
         }
     }
     
@@ -253,16 +264,16 @@ class FileMonitor: ObservableObject {
         
         switch errno {
         case EACCES:
-            print("🚫 Permission denied accessing directory: \(path)")
-            print("   Please ensure ClaudeNein has necessary file system permissions")
+            Logger.security.error("🚫 Permission denied accessing directory: \(path, privacy: .private)")
+            Logger.security.notice("   Please ensure ClaudeNein has necessary file system permissions")
         case ENOENT:
-            print("❓ Directory not found: \(path)")
+            Logger.fileMonitor.notice("❓ Directory not found: \(path, privacy: .private)")
         case ENOTDIR:
-            print("⚠️ Path is not a directory: \(path)")
+            Logger.fileMonitor.error("⚠️ Path is not a directory: \(path, privacy: .private)")
         case EMFILE, ENFILE:
-            print("💾 Too many open files - system limit reached")
+            Logger.fileMonitor.fault("💾 Too many open files - system limit reached")
         default:
-            print("⚠️ Failed to open directory for monitoring: \(path) (\(error))")
+            Logger.fileMonitor.error("⚠️ Failed to open directory for monitoring: \(path, privacy: .private) (\(error))")
         }
     }
     
@@ -362,56 +373,59 @@ class FileMonitor: ObservableObject {
                 let entries = try parser.parseJSONLFile(at: file)
                 updateCacheWithEntries(entries, from: file)
                 hasChanges = true
-                print("📊 Updated \(entries.count) entries from \(file.lastPathComponent)")
+                Logger.parser.logDataProcessing("File update", count: entries.count)
+                Logger.fileMonitor.logFileOperation("Updated", path: file.lastPathComponent, success: true)
             } catch {
-                print("⚠️ Failed to parse updated file \(file): \(error.localizedDescription)")
+                Logger.parser.logError(error, context: "Parsing updated file \(file.lastPathComponent)")
             }
         }
         
         if hasChanges {
-            print("🔄 Processed changes in \(files.count) files")
+            Logger.fileMonitor.info("🔄 Processed changes in \(files.count) files")
         }
     }
     
     private func performFullScan() {
-        print("🔍 Performing full scan of JSONL files...")
-        
-        let allFiles = JSONLParser.discoverJSONLFiles(in: monitoredDirectories)
-        let parser = JSONLParser()
-        var totalEntries = 0
-        
-        // Update file tracking
-        trackedFiles.removeAll()
-        processedEntries.removeAll()
-        
-        for file in allFiles {
-            guard let fileState = FileState.create(from: file) else {
-                continue
+        Logger.performance.logTiming("Full JSONL files scan") {
+            let allFiles = JSONLParser.discoverJSONLFiles(in: monitoredDirectories)
+            let parser = JSONLParser()
+            var totalEntries = 0
+            
+            Logger.fileMonitor.info("🔍 Starting full scan of \(allFiles.count) JSONL files")
+            
+            // Update file tracking
+            trackedFiles.removeAll()
+            processedEntries.removeAll()
+            
+            for file in allFiles {
+                guard let fileState = FileState.create(from: file) else {
+                    continue
+                }
+                
+                trackedFiles[file] = fileState
+                
+                do {
+                    let entries = try parser.parseJSONLFile(at: file)
+                    updateCacheWithEntries(entries, from: file)
+                    totalEntries += entries.count
+                } catch {
+                    Logger.parser.logError(error, context: "Full scan parsing \(file.lastPathComponent)")
+                }
             }
             
-            trackedFiles[file] = fileState
+            lastFullScan = Date()
+            Logger.fileMonitor.info("✅ Full scan complete: \(totalEntries) entries from \(allFiles.count) files")
             
-            do {
-                let entries = try parser.parseJSONLFile(at: file)
-                updateCacheWithEntries(entries, from: file)
-                totalEntries += entries.count
-            } catch {
-                print("⚠️ Failed to parse \(file): \(error.localizedDescription)")
+            // Notify about the full refresh
+            let notification = FileChangeNotification(
+                changedFiles: allFiles,
+                timestamp: Date()
+            )
+            
+            DispatchQueue.main.async { [weak self] in
+                self?.fileChangeSubject.send(notification)
+                self?.lastUpdateTime = Date()
             }
-        }
-        
-        lastFullScan = Date()
-        print("✅ Full scan complete: \(totalEntries) entries from \(allFiles.count) files")
-        
-        // Notify about the full refresh
-        let notification = FileChangeNotification(
-            changedFiles: allFiles,
-            timestamp: Date()
-        )
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.fileChangeSubject.send(notification)
-            self?.lastUpdateTime = Date()
         }
     }
     
@@ -446,7 +460,7 @@ class FileMonitor: ObservableObject {
     }
     
     private func checkForMissedChanges() {
-        print("🔄 Periodic refresh check...")
+        Logger.fileMonitor.debug("🔄 Periodic refresh check starting")
         
         var changedFiles: [URL] = []
         
@@ -454,6 +468,7 @@ class FileMonitor: ObservableObject {
         for (file, previousState) in trackedFiles {
             guard let currentState = FileState.create(from: file) else {
                 // File no longer exists
+                Logger.fileMonitor.notice("📁 File no longer exists: \(file.lastPathComponent)")
                 changedFiles.append(file)
                 continue
             }
@@ -467,10 +482,13 @@ class FileMonitor: ObservableObject {
         // Check for new files
         let discoveredFiles = JSONLParser.discoverJSONLFiles(in: monitoredDirectories)
         let newFiles = discoveredFiles.filter { trackedFiles[$0] == nil }
+        if !newFiles.isEmpty {
+            Logger.fileMonitor.info("📁 Discovered \(newFiles.count) new files")
+        }
         changedFiles.append(contentsOf: newFiles)
         
         if !changedFiles.isEmpty {
-            print("📁 Found \(changedFiles.count) changed files during periodic check")
+            Logger.fileMonitor.info("📁 Found \(changedFiles.count) changed files during periodic check")
             processFileChanges(changedFiles)
             
             let notification = FileChangeNotification(
@@ -482,6 +500,8 @@ class FileMonitor: ObservableObject {
                 self?.fileChangeSubject.send(notification)
                 self?.lastUpdateTime = Date()
             }
+        } else {
+            Logger.fileMonitor.debug("✅ No changes detected during periodic check")
         }
     }
 }

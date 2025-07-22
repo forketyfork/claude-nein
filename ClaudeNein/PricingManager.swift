@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Manages pricing data for Claude models and calculates costs
 class PricingManager {
@@ -12,6 +13,7 @@ class PricingManager {
     private var cachedPricing: ModelPricing?
     
     private init() {
+        Logger.calculator.debug("🔧 Initializing PricingManager")
         loadCachedPricing()
     }
     
@@ -47,7 +49,7 @@ class PricingManager {
         let pricing = getCurrentPricing()
         guard let modelPricing = pricing.models[entry.model] else {
             // Unknown model, use a default rate or return 0
-            print("⚠️ Unknown model pricing for: \(entry.model)")
+            Logger.calculator.notice("⚠️ Unknown model pricing for: \(entry.model)")
             return 0.0
         }
         

@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import OSLog
 
 @main
 struct ClaudeNeinApp: App {
@@ -29,32 +30,44 @@ class MenuBarManager: ObservableObject {
     @Published private var currentSummary = SpendSummary.empty
     
     init() {
+        Logger.app.info("🚀 Initializing ClaudeNein MenuBarManager")
         setupMenuBar()
         setupFileMonitoring()
+        Logger.app.info("✅ ClaudeNein MenuBarManager initialized successfully")
     }
     
     deinit {
+        Logger.app.info("🛑 Deinitializing MenuBarManager")
         statusItem = nil
         fileMonitor.stopMonitoring()
+        Logger.app.info("✅ MenuBarManager deinitialized")
     }
     
     private func setupMenuBar() {
+        Logger.menuBar.debug("🔧 Setting up menu bar")
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
-        guard let statusButton = statusItem?.button else { return }
+        guard let statusButton = statusItem?.button else { 
+            Logger.menuBar.error("❌ Failed to get status button from status item")
+            return 
+        }
         
         updateStatusBarTitle()
         statusButton.action = #selector(menuBarButtonClicked)
         statusButton.target = self
         
         setupMenu()
+        Logger.menuBar.info("✅ Menu bar setup completed")
     }
     
     private func setupFileMonitoring() {
+        Logger.fileMonitor.debug("🔧 Setting up file monitoring")
+        
         // Subscribe to file changes
         fileMonitor.fileChanges
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+            .sink { [weak self] notification in
+                Logger.fileMonitor.info("📁 File changes detected: \(notification.changedFiles.count) files")
                 self?.refreshSpendingSummary()
             }
             .store(in: &cancellables)
@@ -63,6 +76,7 @@ class MenuBarManager: ObservableObject {
         $currentSummary
             .receive(on: DispatchQueue.main)
             .sink { [weak self] summary in
+                Logger.menuBar.debug("📊 Updating UI with new spend summary")
                 self?.updateStatusBarTitle()
                 self?.updateMenu()
             }
@@ -73,6 +87,7 @@ class MenuBarManager: ObservableObject {
         
         // Initial data refresh
         refreshSpendingSummary()
+        Logger.fileMonitor.info("✅ File monitoring setup completed")
     }
     
     private func setupMenu() {
@@ -135,28 +150,39 @@ class MenuBarManager: ObservableObject {
     }
     
     @objc private func refreshData() {
+        Logger.app.info("🔄 Manual refresh requested")
         fileMonitor.forceRefresh()
         refreshSpendingSummary()
     }
     
     @objc private func quitApp() {
+        Logger.app.info("👋 User requested app termination")
         NSApplication.shared.terminate(nil)
     }
     
     // MARK: - Private Helper Methods
     
     private func refreshSpendingSummary() {
-        let entries = fileMonitor.getCachedEntries()
-        let newSummary = spendCalculator.calculateSpendSummary(from: entries)
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.currentSummary = newSummary
+        Logger.calculator.logTiming("Spending summary calculation") {
+            let entries = fileMonitor.getCachedEntries()
+            Logger.calculator.logDataProcessing("Spending calculation", count: entries.count)
+            let newSummary = spendCalculator.calculateSpendSummary(from: entries)
+            
+            DispatchQueue.main.async { [weak self] in
+                self?.currentSummary = newSummary
+                Logger.calculator.info("💰 Updated spend summary - Today: $\(String(format: "%.2f", newSummary.todaySpend))")
+            }
         }
     }
     
     private func updateStatusBarTitle() {
-        guard let statusButton = statusItem?.button else { return }
-        statusButton.title = formatCurrency(currentSummary.todaySpend)
+        guard let statusButton = statusItem?.button else { 
+            Logger.menuBar.error("❌ Cannot update status bar title - no status button")
+            return 
+        }
+        let title = formatCurrency(currentSummary.todaySpend)
+        statusButton.title = title
+        Logger.menuBar.debug("📱 Updated status bar title: \(title)")
     }
     
     private func formatCurrency(_ amount: Double, label: String? = nil) -> String {
