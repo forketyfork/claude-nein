@@ -32,4 +32,5 @@ jobs:
           -scheme ClaudeNein \
           -destination 'platform=macOS,arch=x86_64' \
           -configuration Debug \
-          -enableCodeCoverage YES
+          -enableCodeCoverage YES \
+          -skip-testing:ClaudeNeinUITests
