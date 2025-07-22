@@ -49,18 +49,18 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Monthly spend calculation (current calendar month)
 
 ### Phase 4: File Monitoring System
-- [ ] Implement `FileMonitor` class using FSEvents:
-  - [ ] Monitor Claude config directories for file changes
-  - [ ] Track file modification timestamps
-  - [ ] Debounce rapid file changes
-- [ ] Create incremental data loading:
-  - [ ] Only parse new/modified files since last check
-  - [ ] Maintain cache of processed entries
-  - [ ] Implement duplicate entry detection and filtering
-- [ ] Add periodic refresh mechanism:
-  - [ ] Timer-based refresh every 10-30 seconds
-  - [ ] Immediate refresh on file system events
-  - [ ] Background processing to avoid UI blocking
+- [x] Implement `FileMonitor` class using DispatchSource:
+  - [x] Monitor Claude config directories for file changes
+  - [x] Track file modification timestamps
+  - [x] Debounce rapid file changes
+- [x] Create incremental data loading:
+  - [x] Only parse new/modified files since last check
+  - [x] Maintain cache of processed entries
+  - [x] Implement duplicate entry detection and filtering
+- [x] Add periodic refresh mechanism:
+  - [x] Timer-based refresh every 10-30 seconds
+  - [x] Immediate refresh on file system events
+  - [x] Background processing to avoid UI blocking
 
 ### Phase 5: Menu Bar Interface
 - [ ] Create `MenuBarManager` class:
