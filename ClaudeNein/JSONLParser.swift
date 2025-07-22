@@ -11,7 +11,11 @@ class JSONLParser {
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             if let string = try? container.decode(String.self) {
-                if let date = ISO8601DateFormatter().date(from: string) {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                if let date = formatter.date(from: string) {
+                    return date
+                } else if let date = ISO8601DateFormatter().date(from: string) {
                     return date
                 }
             }
@@ -33,7 +37,9 @@ class JSONLParser {
     
     /// Parse JSONL content string and return valid usage entries with optional deduplication
     func parseJSONLContent(_ content: String, enableDeduplication: Bool = true) -> [UsageEntry] {
-        let lines = content.components(separatedBy: .newlines)
+        // Split by \n for consistent line parsing across platforms
+        let lines = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         
@@ -63,7 +69,12 @@ class JSONLParser {
             return nil
         }
         
-        // First, try to parse as Claude log entry to extract usage data
+        // First, try to parse as standard usage entry format
+        if let usageEntry = parseStandardFormat(data: data, lineNumber: lineNumber) {
+            return usageEntry
+        }
+        
+        // Second, try to parse as Claude log entry to extract usage data
         if let usageEntry = parseClaudeLogEntry(data: data, lineNumber: lineNumber) {
             return usageEntry
         }
@@ -72,28 +83,9 @@ class JSONLParser {
         do {
             let entry = try decoder.decode(UsageEntry.self, from: data)
             return entry
-        } catch let DecodingError.keyNotFound(key, context) {
-            // Only log as error if it's not a Claude log entry (which we already tried to parse)
-            if !isClaudeLogEntry(data: data) {
-                logParsingError("Missing required key '\(key.stringValue)': \(context.debugDescription)", 
-                              lineNumber: lineNumber, line: line)
-            }
-            return nil
-        } catch let DecodingError.typeMismatch(type, context) {
-            logParsingError("Type mismatch for \(type): \(context.debugDescription)", 
-                          lineNumber: lineNumber, line: line)
-            return nil
-        } catch let DecodingError.valueNotFound(type, context) {
-            logParsingError("Value not found for \(type): \(context.debugDescription)", 
-                          lineNumber: lineNumber, line: line)
-            return nil
-        } catch let DecodingError.dataCorrupted(context) {
-            logParsingError("Data corrupted: \(context.debugDescription)", 
-                          lineNumber: lineNumber, line: line)
-            return nil
         } catch {
-            logParsingError("Unknown parsing error: \(error.localizedDescription)", 
-                          lineNumber: lineNumber, line: line)
+            // Silently skip invalid lines for robustness
+            Logger.parser.debug("⚠️ Skipping invalid JSON line \(lineNumber): \(error.localizedDescription)")
             return nil
         }
     }
@@ -141,6 +133,71 @@ class JSONLParser {
         return nil
     }
     
+    /// Parse standard usage entry format with proper schema validation
+    private func parseStandardFormat(data: Data, lineNumber: Int) -> UsageEntry? {
+        do {
+            // Parse the JSON structure for standard usage format
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                return parseUsageEntryFormat(json: json)
+            }
+        } catch {
+            // Not valid JSON or not standard format
+        }
+        return nil
+    }
+    
+    /// Parse JSON dictionary in standard usage entry format
+    private func parseUsageEntryFormat(json: [String: Any]) -> UsageEntry? {
+        // Check for required standard schema structure
+        guard let timestampString = json["timestamp"] as? String,
+              let message = json["message"] as? [String: Any],
+              let usage = message["usage"] as? [String: Any],
+              let inputTokens = usage["input_tokens"] as? Int,
+              let outputTokens = usage["output_tokens"] as? Int else {
+            return nil
+        }
+        
+        // Parse timestamp with fractional seconds support
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let timestamp = formatter.date(from: timestampString) ?? ISO8601DateFormatter().date(from: timestampString) else {
+            return nil
+        }
+        
+        // Extract optional fields
+        let model = message["model"] as? String ?? "unknown"
+        let messageId = message["id"] as? String
+        let requestId = json["requestId"] as? String
+        let costUSD = json["costUSD"] as? Double
+        _ = json["version"] as? String
+        
+        // Extract cache tokens
+        let cacheCreationTokens = usage["cache_creation_input_tokens"] as? Int ?? 0
+        let cacheReadTokens = usage["cache_read_input_tokens"] as? Int ?? 0
+        let totalCachedTokens = cacheCreationTokens + cacheReadTokens
+        
+        let tokenCounts = TokenCounts(
+            input: inputTokens,
+            output: outputTokens,
+            cached: totalCachedTokens > 0 ? totalCachedTokens : nil
+        )
+        
+        // Generate ID - use messageId if available, otherwise create from timestamp
+        let id = messageId ?? UUID().uuidString
+        
+        return UsageEntry(
+            id: id,
+            timestamp: timestamp,
+            model: model,
+            tokenCounts: tokenCounts,
+            cost: costUSD,
+            sessionId: nil, // Not available in standard format
+            projectPath: nil, // Will be extracted from file path
+            requestId: requestId,
+            messageId: messageId
+        )
+    }
+    
     /// Check if data represents a Claude log entry
     private func isClaudeLogEntry(data: Data) -> Bool {
         do {
@@ -170,22 +227,26 @@ class JSONLParser {
     static func getEarliestTimestamp(from url: URL) -> Date? {
         do {
             let content = try String(contentsOf: url, encoding: .utf8)
-            let lines = content.components(separatedBy: .newlines)
+            let lines = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
             
             var earliestDate: Date? = nil
             let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let fallbackFormatter = ISO8601DateFormatter()
             
             for line in lines {
                 guard let data = line.data(using: .utf8) else { continue }
                 
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let timestampString = json["timestamp"] as? String,
-                       let date = formatter.date(from: timestampString) {
-                        if earliestDate == nil || date < earliestDate! {
-                            earliestDate = date
+                       let timestampString = json["timestamp"] as? String {
+                        if let date = formatter.date(from: timestampString) ?? fallbackFormatter.date(from: timestampString) {
+                            if earliestDate == nil || date < earliestDate! {
+                                earliestDate = date
+                            }
                         }
                     }
                 } catch {

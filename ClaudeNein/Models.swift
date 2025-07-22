@@ -23,7 +23,11 @@ struct ClaudeSummaryEntry: ClaudeLogEntry {
         summary = try container.decode(String.self, forKey: .summary)
         leafUuid = try container.decode(String.self, forKey: .leafUuid)
         timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
-            .flatMap { ISO8601DateFormatter().date(from: $0) }
+            .flatMap { timestampString in
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return formatter.date(from: timestampString) ?? ISO8601DateFormatter().date(from: timestampString)
+            }
     }
     
     enum CodingKeys: String, CodingKey {
@@ -60,7 +64,11 @@ struct ClaudeUserEntry: ClaudeLogEntry {
         isMeta = try container.decodeIfPresent(Bool.self, forKey: .isMeta)
         message = try container.decodeIfPresent(ClaudeMessage.self, forKey: .message)
         timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
-            .flatMap { ISO8601DateFormatter().date(from: $0) }
+            .flatMap { timestampString in
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return formatter.date(from: timestampString) ?? ISO8601DateFormatter().date(from: timestampString)
+            }
     }
     
     enum CodingKeys: String, CodingKey {
@@ -124,7 +132,11 @@ struct ClaudeAssistantEntry: ClaudeLogEntry {
         parentUuid = try container.decodeIfPresent(String.self, forKey: .parentUuid)
         message = try container.decodeIfPresent(ClaudeMessage.self, forKey: .message)
         timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
-            .flatMap { ISO8601DateFormatter().date(from: $0) }
+            .flatMap { timestampString in
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return formatter.date(from: timestampString) ?? ISO8601DateFormatter().date(from: timestampString)
+            }
     }
     
     enum CodingKeys: String, CodingKey {
@@ -179,7 +191,7 @@ struct UsageEntry: Codable, Equatable, Hashable {
     /// Generate unique hash for deduplication based on request and message IDs
     func uniqueHash() -> String? {
         guard let requestId = requestId, let messageId = messageId else { return nil }
-        return "\(requestId)-\(messageId)"
+        return "\(messageId):\(requestId)"
     }
     
     /// Implement Hashable protocol
@@ -203,7 +215,9 @@ struct UsageEntry: Codable, Equatable, Hashable {
         
         // Handle various timestamp formats
         if let timestampString = try? container.decode(String.self, forKey: .timestamp) {
-            timestamp = ISO8601DateFormatter().date(from: timestampString) ?? Date()
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            timestamp = formatter.date(from: timestampString) ?? ISO8601DateFormatter().date(from: timestampString) ?? Date()
         } else if let timestampDouble = try? container.decode(Double.self, forKey: .timestamp) {
             timestamp = Date(timeIntervalSince1970: timestampDouble)
         } else {

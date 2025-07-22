@@ -201,11 +201,109 @@ struct JSONLParserTests {
             messageId: "msg-456"
         )
         
-        // Same request and message IDs should produce same hash
-        #expect(entry1.uniqueHash() == entry2.uniqueHash())
+        // Same request and message IDs should produce same hash with new format
+        let expectedHash = "msg-456:req-123"
+        #expect(entry1.uniqueHash() == expectedHash)
+        #expect(entry2.uniqueHash() == expectedHash)
         
         // Missing request ID should return nil
         #expect(entry3.uniqueHash() == nil)
+    }
+    
+    @Test func testFractionalSecondsTimestampParsing() {
+        let parser = JSONLParser()
+        
+        // Test parsing entries with fractional seconds in timestamps
+        let jsonlContent = """
+        {"timestamp": "2024-07-21T10:00:00.123Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
+        {"timestamp": "2024-07-21T10:00:00.456789Z", "message": {"id": "msg-2", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}}
+        {"timestamp": "2024-07-21T10:00:00Z", "message": {"id": "msg-3", "model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        #expect(entries.count == 3)
+        
+        // Check that timestamps with fractional seconds were parsed correctly
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        // First entry with .123 fractional seconds
+        let expectedTime1 = formatter.date(from: "2024-07-21T10:00:00.123Z")
+        #expect(entries[0].timestamp == expectedTime1)
+        
+        // Second entry with .456789 fractional seconds
+        let expectedTime2 = formatter.date(from: "2024-07-21T10:00:00.456789Z")
+        #expect(entries[1].timestamp == expectedTime2)
+        
+        // Third entry without fractional seconds (should still work)
+        let standardFormatter = ISO8601DateFormatter()
+        let expectedTime3 = standardFormatter.date(from: "2024-07-21T10:00:00Z")
+        #expect(entries[2].timestamp == expectedTime3)
+    }
+    
+    @Test func testStandardUsageFormatParsing() {
+        let parser = JSONLParser()
+        
+        // Test standard usage entry format with proper schema
+        let jsonlContent = """
+        {"timestamp": "2024-07-21T10:00:00.123Z", "requestId": "req-123", "version": "1.0", "message": {"id": "msg-456", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 1000, "output_tokens": 2000, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 200}}, "costUSD": 15.5}
+        {"timestamp": "2024-07-21T10:01:00Z", "message": {"model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 500, "output_tokens": 1000}}}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        #expect(entries.count == 2)
+        
+        // First entry - full schema with cached tokens
+        let entry1 = entries[0]
+        #expect(entry1.model == "claude-3-5-sonnet-20241022")
+        #expect(entry1.tokenCounts.input == 1000)
+        #expect(entry1.tokenCounts.output == 2000)
+        #expect(entry1.tokenCounts.cached == 300) // 100 + 200
+        #expect(entry1.cost == 15.5)
+        #expect(entry1.requestId == "req-123")
+        #expect(entry1.messageId == "msg-456")
+        
+        // Second entry - minimal schema
+        let entry2 = entries[1]
+        #expect(entry2.model == "claude-3-5-haiku-20241022")
+        #expect(entry2.tokenCounts.input == 500)
+        #expect(entry2.tokenCounts.output == 1000)
+        #expect(entry2.tokenCounts.cached == nil)
+        #expect(entry2.cost == nil)
+    }
+    
+    @Test func testImprovedLineParsingWithNewlines() {
+        let parser = JSONLParser()
+        
+        // Test consistent line parsing with different line ending styles
+        let contentWithMixedLineEndings = "{\"timestamp\": \"2024-07-21T10:00:00Z\", \"message\": {\"model\": \"claude-3-5-sonnet-20241022\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 200}}}\n{\"timestamp\": \"2024-07-21T10:01:00Z\", \"message\": {\"model\": \"claude-3-5-haiku-20241022\", \"usage\": {\"input_tokens\": 50, \"output_tokens\": 100}}}\n"
+        
+        let entries = parser.parseJSONLContent(contentWithMixedLineEndings)
+        
+        #expect(entries.count == 2)
+        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
+        #expect(entries[1].model == "claude-3-5-haiku-20241022")
+    }
+    
+    @Test func testRobustErrorHandlingInParsing() {
+        let parser = JSONLParser()
+        
+        // Test that invalid lines are silently skipped without causing errors
+        let jsonlContent = """
+        {"timestamp": "2024-07-21T10:00:00Z", "message": {"model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
+        {invalid json without proper structure
+        {"timestamp": "invalid-timestamp", "message": {"model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}}
+        {"timestamp": "2024-07-21T10:02:00Z", "message": {"model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        // Should parse the valid entries and silently skip invalid ones
+        #expect(entries.count == 2)
+        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
+        #expect(entries[1].model == "claude-3-opus-20240229")
     }
     
     @Test func testChronologicalFileSorting() {
