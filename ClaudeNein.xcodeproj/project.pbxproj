@@ -178,7 +178,6 @@
 					};
 					1044BE582E2E6A9200CF5877 = {
 						CreatedOnToolsVersion = 16.4;
-						TestTargetID = 1044BE4A2E2E6A9100CF5877;
 					};
 					1044BE622E2E6A9200CF5877 = {
 						CreatedOnToolsVersion = 16.4;
@@ -448,7 +447,6 @@
 		1044BE712E2E6A9200CF5877 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BSCHQJ3CR8;
@@ -459,14 +457,12 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClaudeNein.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ClaudeNein";
 			};
 			name = Debug;
 		};
 		1044BE722E2E6A9200CF5877 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BSCHQJ3CR8;
@@ -477,7 +473,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClaudeNein.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ClaudeNein";
 			};
 			name = Release;
 		};

@@ -19,8 +19,6 @@ struct ClaudeNeinApp: App {
     }
 }
 
-// MARK: - Test Helper
-
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
     
