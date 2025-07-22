@@ -536,21 +536,33 @@ struct SpendCalculatorTests {
     @Test func testCalculateSpendSummary() {
         let calculator = SpendCalculator()
         let now = Date()
-        
-        // Create test entries for different time periods
+        let calendar = Calendar.current
+
+        // Determine start of week and month according to locale
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)!.start
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
+
+        // Create entries spanning different periods
         let todayEntry = createTestEntry(id: "today", timestamp: now, cost: 1.0)
-        let yesterdayEntry = createTestEntry(id: "yesterday", timestamp: Calendar.current.date(byAdding: .day, value: -1, to: now)!, cost: 2.0)
-        let weekAgoEntry = createTestEntry(id: "week", timestamp: Calendar.current.date(byAdding: .day, value: -7, to: now)!, cost: 3.0)
-        let monthAgoEntry = createTestEntry(id: "month", timestamp: Calendar.current.date(byAdding: .day, value: -35, to: now)!, cost: 4.0)
-        
-        let entries = [todayEntry, yesterdayEntry, weekAgoEntry, monthAgoEntry]
+        let weekStartEntry = createTestEntry(id: "week-start", timestamp: startOfWeek, cost: 2.0)
+        let beforeWeekEntry = createTestEntry(id: "before-week", timestamp: calendar.date(byAdding: .hour, value: -1, to: startOfWeek)!, cost: 3.0)
+        let monthStartEntry = createTestEntry(id: "month-start", timestamp: startOfMonth, cost: 4.0)
+        let beforeMonthEntry = createTestEntry(id: "before-month", timestamp: calendar.date(byAdding: .hour, value: -1, to: startOfMonth)!, cost: 5.0)
+
+        let entries = [todayEntry, weekStartEntry, beforeWeekEntry, monthStartEntry, beforeMonthEntry]
         let summary = calculator.calculateSpendSummary(from: entries)
-        
+
+        // Today spend should only include today's entry
         #expect(summary.todaySpend == 1.0)
-        // Week includes today + yesterday + week ago (last 7 days)
-        #expect(summary.weekSpend >= 3.0) // At least today + yesterday + week ago
-        // Month depends on calendar month boundaries
-        #expect(summary.monthSpend >= 1.0) // At least today
+
+        // Week spend should include entries from startOfWeek onwards
+        let expectedWeekSpend = PricingManager.shared.calculateTotalCost(for: [todayEntry, weekStartEntry])
+        #expect(abs(summary.weekSpend - expectedWeekSpend) < 0.001)
+
+        // Month spend should include entries from startOfMonth onwards
+        let expectedMonthEntries = [todayEntry, weekStartEntry, beforeWeekEntry, monthStartEntry]
+        let expectedMonthSpend = PricingManager.shared.calculateTotalCost(for: expectedMonthEntries)
+        #expect(abs(summary.monthSpend - expectedMonthSpend) < 0.001)
     }
     
     @Test func testCalculateSpendSummaryWithCostModes() {
