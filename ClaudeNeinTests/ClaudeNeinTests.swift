@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import Combine
 @testable import ClaudeNein
 
 struct ClaudeNeinTests {
@@ -480,5 +481,155 @@ struct ErrorHandlingTests {
         #expect(entry.cost == 1.5)
         #expect(entry.sessionId == "session-test")
         #expect(entry.projectPath == "/custom/path")
+    }
+}
+
+// MARK: - FileMonitor Tests
+
+struct FileMonitorTests {
+    
+    @Test func testFileStateCreation() {
+        // Create a temporary file for testing
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("test_file_\(UUID().uuidString).txt")
+        
+        // Write test content to file
+        let testContent = "test content"
+        try? testContent.write(to: testFile, atomically: true, encoding: .utf8)
+        
+        // Test FileState creation
+        let fileState = FileMonitor.FileState.create(from: testFile)
+        
+        #expect(fileState != nil)
+        #expect(fileState?.url == testFile)
+        #expect((fileState?.size ?? 0) > 0)
+        
+        // Clean up
+        try? FileManager.default.removeItem(at: testFile)
+    }
+    
+    @Test func testFileStateCreationWithNonexistentFile() {
+        let nonexistentFile = URL(fileURLWithPath: "/nonexistent/path/file.txt")
+        let fileState = FileMonitor.FileState.create(from: nonexistentFile)
+        
+        #expect(fileState == nil)
+    }
+    
+    @Test func testFileMonitorInitialization() {
+        let fileMonitor = FileMonitor()
+        
+        #expect(fileMonitor.isMonitoring == false)
+        #expect(fileMonitor.getCachedEntries().isEmpty)
+    }
+    
+    @Test func testFileChangeNotificationStructure() {
+        let testFiles = [
+            URL(fileURLWithPath: "/test/file1.jsonl"),
+            URL(fileURLWithPath: "/test/file2.jsonl")
+        ]
+        
+        let notification = FileMonitor.FileChangeNotification(
+            changedFiles: testFiles,
+            timestamp: Date()
+        )
+        
+        #expect(notification.changedFiles.count == 2)
+        #expect(notification.changedFiles[0].path == "/test/file1.jsonl")
+        #expect(notification.changedFiles[1].path == "/test/file2.jsonl")
+    }
+    
+    @Test func testFileMonitorErrorTypes() {
+        let permissionError = FileMonitor.FileMonitorError.permissionDenied(path: "/restricted/path")
+        let fileNotFoundError = FileMonitor.FileMonitorError.fileNotFound(path: "/missing/file")
+        let diskFullError = FileMonitor.FileMonitorError.diskFull
+        let corruptedFileError = FileMonitor.FileMonitorError.corruptedFile(path: "/bad/file")
+        let networkError = FileMonitor.FileMonitorError.networkError(path: "/network/path")
+        let unknownError = FileMonitor.FileMonitorError.unknownError(underlying: NSError(domain: "test", code: 1))
+        
+        #expect(permissionError.errorDescription?.contains("Permission denied") == true)
+        #expect(fileNotFoundError.errorDescription?.contains("File not found") == true)
+        #expect(diskFullError.errorDescription?.contains("Disk is full") == true)
+        #expect(corruptedFileError.errorDescription?.contains("corrupted") == true)
+        #expect(networkError.errorDescription?.contains("Network") == true)
+        #expect(unknownError.errorDescription?.contains("Unknown error") == true)
+    }
+    
+    @Test func testClearCacheOperation() {
+        let fileMonitor = FileMonitor()
+        
+        // Initially, cache should be empty
+        #expect(fileMonitor.getCachedEntries().isEmpty)
+        
+        // Clear cache should not cause any issues when empty
+        fileMonitor.clearCache()
+        #expect(fileMonitor.getCachedEntries().isEmpty)
+    }
+    
+    @Test func testGetModifiedEntriesWithEmptyCache() {
+        let fileMonitor = FileMonitor()
+        let testDate = Date()
+        
+        let modifiedEntries = fileMonitor.getModifiedEntries(since: testDate)
+        #expect(modifiedEntries.isEmpty)
+    }
+    
+    @Test func testFileMonitorPublisherSetup() {
+        let fileMonitor = FileMonitor()
+        
+        // Test that fileChanges publisher is accessible
+        let publisher = fileMonitor.fileChanges
+        
+        // Verify publisher type
+        #expect(publisher is AnyPublisher<FileMonitor.FileChangeNotification, Never>)
+    }
+    
+    @Test func testFileMonitorThreadSafety() {
+        let fileMonitor = FileMonitor()
+        var results: [Int] = []
+        let resultsLock = NSLock()
+        
+        // Simulate concurrent access to getCachedEntries
+        DispatchQueue.concurrentPerform(iterations: 10) { index in
+            let entries = fileMonitor.getCachedEntries()
+            resultsLock.lock()
+            results.append(entries.count)
+            resultsLock.unlock()
+        }
+        
+        // All concurrent calls should complete successfully
+        #expect(results.count == 10)
+        
+        // All results should be the same (empty cache)
+        let uniqueResults = Set(results)
+        #expect(uniqueResults.count == 1)
+        #expect(uniqueResults.first == 0)
+    }
+    
+    @Test func testFileMonitorForceRefresh() {
+        let fileMonitor = FileMonitor()
+        
+        // Force refresh should not crash when no monitoring is active
+        fileMonitor.forceRefresh()
+        
+        // Cache should still be empty
+        #expect(fileMonitor.getCachedEntries().isEmpty)
+    }
+    
+    @Test func testFileMonitorMultipleStartStop() {
+        let fileMonitor = FileMonitor()
+        
+        // Multiple starts should be safe
+        fileMonitor.startMonitoring()
+        fileMonitor.startMonitoring()
+        fileMonitor.startMonitoring()
+        
+        // Multiple stops should be safe
+        fileMonitor.stopMonitoring()
+        fileMonitor.stopMonitoring()
+        fileMonitor.stopMonitoring()
+        
+        // Should not be monitoring after stops
+        Thread.sleep(forTimeInterval: 0.1) // Give it time to process
+        #expect(fileMonitor.isMonitoring == false)
     }
 }

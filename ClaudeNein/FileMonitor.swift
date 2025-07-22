@@ -19,8 +19,30 @@ class FileMonitor: ObservableObject {
                 let size = attributes[.size] as? Int64 ?? 0
                 return FileState(url: url, modificationDate: modificationDate, size: size)
             } catch {
-                print("⚠️ Failed to get file attributes for \(url): \(error.localizedDescription)")
+                handleFileSystemError(error, path: url.path)
                 return nil
+            }
+        }
+        
+        private static func handleFileSystemError(_ error: Error, path: String) {
+            let nsError = error as NSError
+            
+            switch nsError.code {
+            case NSFileReadNoPermissionError:
+                print("🚫 Permission denied: \(path)")
+            case NSFileReadNoSuchFileError:
+                print("❓ File not found: \(path)")
+            case NSFileReadCorruptFileError:
+                print("💥 Corrupted file: \(path)")
+            default:
+                // Check for disk full
+                if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
+                    print("💾 Disk full - cannot process: \(path)")
+                } else if path.hasPrefix("/Volumes/") || path.hasPrefix("//") {
+                    print("🌐 Network file system error: \(path)")
+                } else {
+                    print("⚠️ Failed to get file attributes for \(path): \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -31,32 +53,59 @@ class FileMonitor: ObservableObject {
         let timestamp: Date
     }
     
+    /// File monitoring errors
+    enum FileMonitorError: Error, LocalizedError {
+        case permissionDenied(path: String)
+        case fileNotFound(path: String)
+        case diskFull
+        case corruptedFile(path: String)
+        case networkError(path: String)
+        case unknownError(underlying: Error)
+        
+        var errorDescription: String? {
+            switch self {
+            case .permissionDenied(let path):
+                return "Permission denied accessing: \(path)"
+            case .fileNotFound(let path):
+                return "File not found: \(path)"
+            case .diskFull:
+                return "Disk is full - cannot process files"
+            case .corruptedFile(let path):
+                return "File appears corrupted: \(path)"
+            case .networkError(let path):
+                return "Network file system error for: \(path)"
+            case .unknownError(let underlying):
+                return "Unknown error: \(underlying.localizedDescription)"
+            }
+        }
+    }
+    
     // MARK: - Properties
     
     @Published private(set) var isMonitoring = false
     @Published private(set) var lastUpdateTime = Date()
     
+    // Use a single serial queue for all file monitoring operations to ensure thread safety
     private let monitorQueue = DispatchQueue(label: "fileMonitor", qos: .utility)
-    private let debounceQueue = DispatchQueue(label: "fileMonitorDebounce", qos: .utility)
     
-    // File state tracking
+    // File state tracking - access only from monitorQueue
     private var trackedFiles: [URL: FileState] = [:]
     private var monitoredDirectories: [URL] = []
     
-    // Debouncing
-    private var debounceTimer: Timer?
+    // Debouncing - access only from monitorQueue
+    private var debounceTimer: DispatchSourceTimer?
     private var pendingChanges: Set<URL> = []
     private let debounceInterval: TimeInterval = 0.5
     
-    // Cache management
+    // Cache management - access only from monitorQueue
     private var processedEntries: [String: UsageEntry] = [:]
     private var lastFullScan: Date?
     
-    // Periodic refresh
-    private var refreshTimer: Timer?
+    // Periodic refresh - access only from monitorQueue
+    private var refreshTimer: DispatchSourceTimer?
     private let refreshInterval: TimeInterval = 20.0
     
-    // Directory watcher using DispatchSource
+    // Directory watcher using DispatchSource - access only from monitorQueue
     private var directoryWatchers: [DispatchSourceFileSystemObject] = []
     
     // Publishers
@@ -100,12 +149,16 @@ class FileMonitor: ObservableObject {
     
     /// Get all cached usage entries
     func getCachedEntries() -> [UsageEntry] {
-        return Array(processedEntries.values)
+        return monitorQueue.sync {
+            Array(processedEntries.values)
+        }
     }
     
     /// Get entries that have been modified since the last check
     func getModifiedEntries(since date: Date) -> [UsageEntry] {
-        return processedEntries.values.filter { $0.timestamp >= date }
+        return monitorQueue.sync {
+            processedEntries.values.filter { $0.timestamp >= date }
+        }
     }
     
     /// Clear the cache and force a full rescan
@@ -153,10 +206,10 @@ class FileMonitor: ObservableObject {
         directoryWatchers.removeAll()
         
         // Stop timers
-        refreshTimer?.invalidate()
+        refreshTimer?.cancel()
         refreshTimer = nil
         
-        debounceTimer?.invalidate()
+        debounceTimer?.cancel()
         debounceTimer = nil
         
         DispatchQueue.main.async { [weak self] in
@@ -173,7 +226,7 @@ class FileMonitor: ObservableObject {
     private func setupWatcher(for directory: URL) {
         let fileDescriptor = open(directory.path, O_EVTONLY)
         guard fileDescriptor >= 0 else {
-            print("⚠️ Failed to open directory for monitoring: \(directory.path)")
+            handleDirectoryOpenError(directory.path)
             return
         }
         
@@ -193,6 +246,24 @@ class FileMonitor: ObservableObject {
         
         source.resume()
         directoryWatchers.append(source)
+    }
+    
+    private func handleDirectoryOpenError(_ path: String) {
+        let error = String(cString: strerror(errno))
+        
+        switch errno {
+        case EACCES:
+            print("🚫 Permission denied accessing directory: \(path)")
+            print("   Please ensure ClaudeNein has necessary file system permissions")
+        case ENOENT:
+            print("❓ Directory not found: \(path)")
+        case ENOTDIR:
+            print("⚠️ Path is not a directory: \(path)")
+        case EMFILE, ENFILE:
+            print("💾 Too many open files - system limit reached")
+        default:
+            print("⚠️ Failed to open directory for monitoring: \(path) (\(error))")
+        }
     }
     
     private func handleDirectoryChange(at directory: URL) {
@@ -224,31 +295,34 @@ class FileMonitor: ObservableObject {
     }
     
     private func scheduleDebounce() {
-        debounceTimer?.invalidate()
-        debounceTimer = Timer.scheduledTimer(withTimeInterval: debounceInterval, repeats: false) { [weak self] _ in
+        debounceTimer?.cancel()
+        
+        let timer = DispatchSource.makeTimerSource(queue: monitorQueue)
+        timer.schedule(deadline: .now() + debounceInterval)
+        timer.setEventHandler { [weak self] in
             self?.processDebounceQueue()
         }
+        timer.resume()
+        
+        debounceTimer = timer
     }
     
     private func processDebounceQueue() {
-        debounceQueue.async { [weak self] in
-            guard let self = self else { return }
+        // This is already running on monitorQueue due to the timer being scheduled on it
+        let changedFiles = Array(pendingChanges)
+        pendingChanges.removeAll()
+        
+        if !changedFiles.isEmpty {
+            processFileChanges(changedFiles)
             
-            let changedFiles = Array(self.pendingChanges)
-            self.pendingChanges.removeAll()
+            let notification = FileChangeNotification(
+                changedFiles: changedFiles,
+                timestamp: Date()
+            )
             
-            if !changedFiles.isEmpty {
-                self.processFileChanges(changedFiles)
-                
-                let notification = FileChangeNotification(
-                    changedFiles: changedFiles,
-                    timestamp: Date()
-                )
-                
-                DispatchQueue.main.async {
-                    self.fileChangeSubject.send(notification)
-                    self.lastUpdateTime = Date()
-                }
+            DispatchQueue.main.async { [weak self] in
+                self?.fileChangeSubject.send(notification)
+                self?.lastUpdateTime = Date()
             }
         }
     }
@@ -361,11 +435,14 @@ class FileMonitor: ObservableObject {
     }
     
     private func startPeriodicRefresh() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            self?.monitorQueue.async {
-                self?.checkForMissedChanges()
-            }
+        let timer = DispatchSource.makeTimerSource(queue: monitorQueue)
+        timer.schedule(deadline: .now() + refreshInterval, repeating: refreshInterval)
+        timer.setEventHandler { [weak self] in
+            self?.checkForMissedChanges()
         }
+        timer.resume()
+        
+        refreshTimer = timer
     }
     
     private func checkForMissedChanges() {
