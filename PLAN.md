@@ -39,6 +39,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Fetch LiteLLM pricing data from API
   - [x] Implement offline fallback with bundled pricing data
   - [x] Cache pricing data locally with expiration
+  - [x] Scheduled pricing refresh every 4 hours
 - [x] Implement cost calculation logic:
   - [x] Calculate costs from token counts using model pricing
   - [x] Handle different token types (input, output, cache)
@@ -113,7 +114,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [ ] Implement comprehensive error handling:
   - [ ] Handle missing Claude config directories
   - [ ] Deal with corrupted JSONL files
-  - [ ] Network errors when fetching pricing data
+  - [x] Network errors when fetching pricing data
   - [ ] File permission issues
 - [ ] Add user feedback mechanisms:
   - [ ] Show error states in menu bar icon

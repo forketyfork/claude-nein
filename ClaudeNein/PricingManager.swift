@@ -4,20 +4,27 @@ import OSLog
 /// Manages pricing data for Claude models and calculates costs
 class PricingManager {
     static let shared = PricingManager()
-    
-    private let userDefaults = UserDefaults.standard
-    private let pricingCacheKey = "cached_pricing_data"
-    private let pricingCacheTimeKey = "cached_pricing_time"
-    private let cacheExpirationHours: Double = 24
+
     private let parser = LiteLLMParser()
-    
+
+    private let cacheExpirationHours: Double = 4
+    private let refreshInterval: TimeInterval = 4 * 3600
+
+    private let cacheURL: URL = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        return caches.appendingPathComponent("model_pricing.json")
+    }()
+
     private var cachedPricing: ModelPricing?
+    private var cacheTimestamp: TimeInterval?
+    private var refreshTimer: Timer?
     private var isInitialFetchComplete = false
     private var dataSource: PricingDataSource = .bundled
-    
+
     private init() {
         Logger.calculator.debug("🔧 Initializing PricingManager")
         loadCachedPricing()
+        scheduleRefresh()
     }
     
     /// Initialize pricing data at app startup
@@ -109,6 +116,28 @@ class PricingManager {
     }
     
     // MARK: - Private Methods
+
+    private func scheduleRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task {
+                await self.refreshPricingData()
+            }
+        }
+    }
+
+    private func refreshPricingData() async {
+        Logger.calculator.info("🔄 Refreshing pricing data from LiteLLM API")
+        do {
+            let pricing = try await fetchPricingFromAPI()
+            cachePricing(pricing)
+            dataSource = .api
+            Logger.calculator.info("✅ Refreshed pricing data from LiteLLM API (\(pricing.models.count) models)")
+        } catch {
+            Logger.calculator.warning("⚠️ Failed to refresh pricing data: \(error.localizedDescription)")
+        }
+    }
     
     private func fetchPricingFromAPI() async throws -> ModelPricing {
         Logger.calculator.debug("🌐 Attempting to fetch pricing data from LiteLLM GitHub")
@@ -166,45 +195,49 @@ class PricingManager {
     
     private func cachePricing(_ pricing: ModelPricing) {
         Logger.calculator.debug("💾 Attempting to cache pricing data")
-        
+
         do {
             let encoder = JSONEncoder()
-            let data = try encoder.encode(pricing)
-            userDefaults.set(data, forKey: pricingCacheKey)
-            userDefaults.set(Date().timeIntervalSince1970, forKey: pricingCacheTimeKey)
+            let container = CachedPricingContainer(timestamp: Date().timeIntervalSince1970, pricing: pricing)
+            let data = try encoder.encode(container)
+            try data.write(to: cacheURL, options: .atomic)
             cachedPricing = pricing
+            cacheTimestamp = container.timestamp
             Logger.calculator.info("💾 Successfully cached pricing data (\(pricing.models.count) models)")
         } catch {
             Logger.calculator.error("❌ Failed to cache pricing data: \(error.localizedDescription)")
         }
     }
-    
+
     private func loadCachedPricing() {
         Logger.calculator.debug("🔍 Checking for cached pricing data")
-        
-        guard let data = userDefaults.data(forKey: pricingCacheKey) else {
+
+        guard let data = try? Data(contentsOf: cacheURL) else {
             Logger.calculator.debug("📭 No cached pricing data found")
             return
         }
-        
-        if isCacheExpired() {
-            Logger.calculator.debug("⏰ Cached pricing data has expired")
-            return
-        }
-        
+
         do {
             let decoder = JSONDecoder()
-            cachedPricing = try decoder.decode(ModelPricing.self, from: data)
+            let container = try decoder.decode(CachedPricingContainer.self, from: data)
+            cacheTimestamp = container.timestamp
+
+            if isCacheExpired() {
+                Logger.calculator.debug("⏰ Cached pricing data has expired")
+                return
+            }
+
+            cachedPricing = container.pricing
             dataSource = .cache
-            Logger.calculator.info("💾 Loaded cached pricing data (\(self.cachedPricing?.models.count ?? 0) models)")
+            Logger.calculator.info("💾 Loaded cached pricing data (\(container.pricing.models.count) models)")
         } catch {
             Logger.calculator.error("❌ Failed to load cached pricing data: \(error.localizedDescription)")
         }
     }
-    
+
     private func isCacheExpired() -> Bool {
-        let cacheTime = userDefaults.double(forKey: pricingCacheTimeKey)
-        let expirationTime = cacheTime + (cacheExpirationHours * 3600)
+        guard let timestamp = cacheTimestamp else { return true }
+        let expirationTime = timestamp + (cacheExpirationHours * 3600)
         return Date().timeIntervalSince1970 > expirationTime
     }
 }
@@ -219,6 +252,11 @@ struct ModelPrice: Codable {
     let inputPrice: Double    // Price per million tokens
     let outputPrice: Double   // Price per million tokens
     let cachedPrice: Double?  // Price per million cached tokens
+}
+
+struct CachedPricingContainer: Codable {
+    let timestamp: TimeInterval
+    let pricing: ModelPricing
 }
 
 // MARK: - Data Source Tracking
