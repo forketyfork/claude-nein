@@ -131,6 +131,7 @@
 				1044BE5B2E2E6A9200CF5877 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				1044BE4D2E2E6A9100CF5877 /* ClaudeNein */,
 				1044BE5C2E2E6A9200CF5877 /* ClaudeNeinTests */,
 			);
 			name = ClaudeNeinTests;
