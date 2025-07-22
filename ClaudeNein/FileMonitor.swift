@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import OSLog
+import CoreServices
 
 /// Monitors Claude config directories for file changes and provides real-time updates
 class FileMonitor: ObservableObject {
@@ -111,6 +112,9 @@ class FileMonitor: ObservableObject {
     
     // Directory watcher using DispatchSource - access only from monitorQueue
     private var directoryWatchers: [DispatchSourceFileSystemObject] = []
+
+    // FSEvents stream for recursive monitoring
+    private var eventStream: FSEventStreamRef?
     
     // Publishers
     private let fileChangeSubject = PassthroughSubject<FileChangeNotification, Never>()
@@ -221,8 +225,11 @@ class FileMonitor: ObservableObject {
             Logger.fileMonitor.debug("📂 Monitoring: \(directory.path, privacy: .private)")
         }
         
-        // Set up directory watchers
+        // Set up directory watchers for immediate changes
         setupDirectoryWatchers()
+
+        // Set up FSEvents stream for recursive monitoring
+        setupFSEventStream()
         
         // Perform initial scan
         performFullScan()
@@ -245,6 +252,9 @@ class FileMonitor: ObservableObject {
         }
         Logger.fileMonitor.debug("📂 Cancelled \(self.directoryWatchers.count) directory watchers")
         directoryWatchers.removeAll()
+
+        // Stop FSEvent stream
+        stopFSEventStream()
         
         // Stop timers
         refreshTimer?.cancel()
@@ -533,6 +543,71 @@ class FileMonitor: ObservableObject {
             }
         } else {
             Logger.fileMonitor.debug("✅ No changes detected during periodic check")
+        }
+    }
+
+    // MARK: - FSEvents Handling
+
+    private func setupFSEventStream() {
+        guard eventStream == nil else { return }
+
+        let paths = monitoredDirectories.map { $0.path } as CFArray
+        var context = FSEventStreamContext(
+            version: 0,
+            info: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+            retain: nil,
+            release: nil,
+            copyDescription: nil
+        )
+
+        eventStream = FSEventStreamCreate(
+            kCFAllocatorDefault,
+            { (
+                streamRef: ConstFSEventStreamRef?,
+                clientCallBackInfo: UnsafeMutableRawPointer?,
+                numEvents: Int,
+                eventPaths: UnsafeMutableRawPointer?,
+                eventFlags: UnsafePointer<FSEventStreamEventFlags>?,
+                eventIds: UnsafePointer<FSEventStreamEventId>?
+            ) in
+                guard let info = clientCallBackInfo,
+                      let pathsPointer = eventPaths else { return }
+
+                let fileMonitor = Unmanaged<FileMonitor>.fromOpaque(info).takeUnretainedValue()
+                let paths = Unmanaged<CFArray>.fromOpaque(pathsPointer).takeUnretainedValue() as? [String] ?? []
+                fileMonitor.handleFSEventPaths(paths)
+            },
+            &context,
+            paths,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            0,
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
+        )
+
+        if let stream = eventStream {
+            FSEventStreamScheduleWithRunLoop(stream, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+            FSEventStreamStart(stream)
+            Logger.fileMonitor.info("📡 FSEvent stream started")
+        }
+    }
+
+    private func stopFSEventStream() {
+        if let stream = eventStream {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+            eventStream = nil
+            Logger.fileMonitor.info("🛑 FSEvent stream stopped")
+        }
+    }
+
+    private func handleFSEventPaths(_ paths: [String]) {
+        monitorQueue.async { [weak self] in
+            guard let self = self else { return }
+            for path in paths {
+                self.pendingChanges.insert(URL(fileURLWithPath: path))
+            }
+            self.scheduleDebounce()
         }
     }
 }

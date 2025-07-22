@@ -53,6 +53,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Monitor Claude config directories for file changes
   - [x] Track file modification timestamps
   - [x] Debounce rapid file changes
+  - [x] Use FSEvents for recursive directory monitoring
 - [x] Create incremental data loading:
   - [x] Only parse new/modified files since last check
   - [x] Maintain cache of processed entries
