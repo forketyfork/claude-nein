@@ -33,6 +33,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Find Claude config directories (`~/.claude/projects/`, `~/.config/claude/projects/`)
   - [x] Implement recursive JSONL file discovery
   - [x] Support custom config directory via environment variable
+  - [x] Persist parsed usage entries to Core Data database
 
 ### Phase 3: Cost Calculation Engine
 - [x] Create `PricingManager` class:

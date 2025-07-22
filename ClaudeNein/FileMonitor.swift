@@ -376,10 +376,8 @@ class FileMonitor: ObservableObject {
         for file in files {
             // Check if file still exists
             guard FileManager.default.fileExists(atPath: file.path) else {
-                // File was deleted, remove from tracking
+                // File was deleted, remove from tracking but keep existing entries
                 trackedFiles.removeValue(forKey: file)
-                // Remove entries from cache that came from this file
-                removeEntriesFromFile(file)
                 hasChanges = true
                 continue
             }
@@ -461,23 +459,16 @@ class FileMonitor: ObservableObject {
     }
     
     private func updateCacheWithEntries(_ entries: [UsageEntry], from file: URL) {
-        // Remove existing entries from this file first
-        removeEntriesFromFile(file)
-        
-        // Add new entries with file source tracking
+        // Add or update entries with file source tracking
         for entry in entries {
             let cacheKey = "\(file.path):\(entry.id)"
             processedEntries[cacheKey] = entry
         }
+
+        // Persist entries to the database
+        DataStore.shared.upsertEntries(entries)
     }
     
-    private func removeEntriesFromFile(_ file: URL) {
-        let filePrefix = "\(file.path):"
-        let keysToRemove = processedEntries.keys.filter { $0.hasPrefix(filePrefix) }
-        for key in keysToRemove {
-            processedEntries.removeValue(forKey: key)
-        }
-    }
     
     private func startPeriodicRefresh() {
         let timer = DispatchSource.makeTimerSource(queue: monitorQueue)

@@ -24,7 +24,6 @@ struct ClaudeNeinApp: App {
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
     private let fileMonitor = FileMonitor()
-    private let spendCalculator = SpendCalculator()
     private var cancellables = Set<AnyCancellable>()
     
     @Published private var currentSummary = SpendSummary.empty
@@ -231,15 +230,10 @@ class MenuBarManager: ObservableObject {
     
     private func refreshSpendingSummary() {
         Logger.calculator.logTiming("Spending summary calculation") {
-            fileMonitor.getCachedEntriesAsync { [weak self] entries in
-                guard let self = self else { return }
-                Logger.calculator.logDataProcessing("Spending calculation", count: entries.count)
-                let newSummary = self.spendCalculator.calculateSpendSummary(from: entries)
-                
-                DispatchQueue.main.async {
-                    self.currentSummary = newSummary
-                    Logger.calculator.info("💰 Updated spend summary - Today: $\(String(format: "%.2f", newSummary.todaySpend))")
-                }
+            let newSummary = DataStore.shared.fetchSpendSummary()
+            DispatchQueue.main.async { [weak self] in
+                self?.currentSummary = newSummary
+                Logger.calculator.info("💰 Updated spend summary - Today: $\(String(format: "%.2f", newSummary.todaySpend))")
             }
         }
     }
