@@ -32,7 +32,8 @@ This is a macOS menu bar application that monitors Claude Code spending in real-
 - Use dependency injection for testability
 - Write unit tests for core business logic
 - **ALWAYS update PLAN.md to check off completed steps after implementing features**
-- **ALWAYS build the project before completing any task to ensure no compilation errors**
+- **ALWAYS build the project using `xcodebuild` before completing any task to ensure no compilation errors**
+- **ALWAYS run the tests before completing any task**: `xcodebuild test -scheme ClaudeNein -destination 'platform=macOS'`
 
 ## Architecture Patterns
 - Use MVVM pattern with SwiftUI
