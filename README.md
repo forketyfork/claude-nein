@@ -1,89 +1,79 @@
 # Claude Nein - Claude Code Spend Monitor
 
-A native macOS menu bar application that displays real-time Claude Code spending with intuitive visual feedback and detailed breakdowns.
+A native macOS menu bar application that monitors your Claude Code spending in real-time, providing intuitive visual feedback and detailed breakdowns.
+
+![Claude Nein Screenshot](...)
 
 ## Overview
 
-Claude Nein monitors your Claude Code usage by parsing JSONL files and displays spending information directly in your menu bar. The app provides:
-
-- **Real-time spend tracking** - Shows today's spend in the menu bar icon
-- **Detailed breakdowns** - Dropdown menu with today/week/month summaries
-- **Native macOS experience** - Built with Swift and SwiftUI
-- **Minimal performance impact** - Efficient file monitoring and caching
+Claude Nein lives in your macOS menu bar, keeping you constantly updated on your Claude Code API usage costs. It automatically discovers your Claude project log files, parses them efficiently, and presents a clear summary of your spending.
 
 ## Features
 
-### Menu Bar Display
-- Current day's spending shown directly in the menu bar
-- Updates automatically as you use Claude Code
-- Clean, readable format that fits naturally in the menu bar
+- **Real-Time Menu Bar Display**: See your total spend for the current day directly in the menu bar. The icon updates automatically.
+- **Detailed Spend Summaries**: A dropdown menu provides breakdowns of your spending for today, the current week, and the current month.
+- **Model-Specific Costs**: See a breakdown of costs per model, so you know which ones are contributing most to your bill.
+- **Automatic & Efficient Monitoring**: The app uses modern file system watching APIs to detect changes in your Claude log files with minimal performance impact.
+- **Secure & Private**: All processing happens locally on your machine. The app only reads log files and makes no other network requests, except to fetch updated pricing information.
+- **Home Directory Access Control**: The app guides you to grant access to the home directory if needed and allows you to revoke it at any time.
+- **Up-to-Date Pricing**: Automatically fetches the latest pricing data from the LiteLLM project, with bundled data as a reliable fallback.
 
-### Detailed Menu
-- Today's spending (prominent display)
-- This week's spending (last 7 days)
-- This month's spending (current calendar month)
-- Quick actions: Refresh, Open Claude Directory, Quit
+## How It Works
 
-### Smart Monitoring
-- Monitors Claude Code configuration directories automatically
-- Efficient file system monitoring with FSEvents
-- Incremental parsing - only processes new/changed files
-- Background processing to avoid blocking the UI
+1.  **Permissions**: The app first ensures it has the necessary read-only access to your home directory to find the Claude log files.
+2.  **File Monitoring**: It identifies Claude project directories (e.g., `~/.claude/`) and starts monitoring the `.jsonl` log files within them for any changes.
+3.  **Parsing**: When a file is changed (i.e., new API calls are logged), the app parses the new entries to extract usage data like model, token counts, and timestamps.
+4.  **Cost Calculation**: Using the latest pricing data, it calculates the cost for each new entry.
+5.  **UI Update**: It aggregates the costs and updates the menu bar display and the detailed dropdown menu.
+
+## Installation
+
+TBD
 
 ## Technical Details
 
-### Architecture
-- **Language**: Swift
-- **Framework**: SwiftUI for UI, AppKit for menu bar integration
-- **Platform**: macOS (menu bar application)
-- **Minimum Version**: macOS 11.0+
+-   **Language**: Swift
+-   **Framework**: SwiftUI for the core logic, AppKit for menu bar integration
+-   **Platform**: macOS
+-   **Architecture**: The app runs as a background agent (`NSStatusItem`) managed by a central `MenuBarManager`. It uses a `FileMonitor` for observing the file system and a `SpendCalculator` for business logic.
 
-### Data Sources
-The app monitors Claude Code JSONL files located in:
-- `~/.claude/projects/`
-- `~/.config/claude/projects/`
-- Custom directories via environment variables
+### Data Source
 
-### Cost Calculation
-- Fetches up-to-date pricing from LiteLLM API
-- Offline fallback with bundled pricing data
-- Supports different token types (input, output, cache)
-- Handles multiple Claude models and pricing tiers
+The app monitors Claude Code `.jsonl` files located in standard Claude config directories, such as:
 
-## Development
-
-### Requirements
-- Xcode 13.0+
-- macOS 11.0+ deployment target
-- Swift 5.5+
-
-### Building
-1. Clone the repository
-2. Open the project in Xcode
-3. Build and run (⌘+R)
+-   `~/.claude/`
 
 ### Project Structure
+
+The project is organized as follows:
+
 ```
-Sources/
-├── App/                 # App lifecycle and configuration
-├── Models/              # Data models and business logic
-├── Views/               # SwiftUI views and UI components
-├── Managers/            # File monitoring, pricing, data processing
-└── Extensions/          # Swift extensions and utilities
+ClaudeNein/
+├── ClaudeNeinApp.swift         # Main app entry point
+├── MenuBarManager.swift        # Core class managing the status item and menu
+├── Models.swift                # Data models (UsageEntry, SpendSummary, etc.)
+├── FileMonitor.swift           # Monitors the file system for log changes
+├── HomeDirectoryAccessManager.swift # Handles permissions for home directory access
+├── SpendCalculator.swift       # Calculates spend totals and breakdowns
+├── PricingManager.swift        # Fetches and manages model pricing data
+├── JSONLParser.swift           # Parses `.jsonl` log files
+├── LiteLLMParser.swift         # Parses pricing data from LiteLLM source
+└── ... (other supporting files)
 ```
 
 ## Privacy & Security
 
-Claude Nein operates entirely locally on your machine:
-- No data is sent to external servers (except for pricing updates)
-- Only reads Claude Code JSONL files for usage calculation
-- Respects macOS file system permissions
-- No user data collection or tracking
+Claude Nein is designed with privacy as a priority:
 
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
+-   **Local Processing**: All log file parsing and calculations happen on your Mac.
+-   **No Data Transmission**: No usage data or personal information is ever sent to any external server.
+-   **Limited Permissions**: The app only requests the read-only permissions necessary to access Claude's log files.
+-   **Transparent Pricing Updates**: The only network request made is to the public LiteLLM GitHub repository to fetch `model_prices_and_context_window.json`.
 
 ## Contributing
 
-Contributions are welcome! Please read the development guidelines in [CLAUDE.md](CLAUDE.md) before submitting pull requests.
+Contributions are welcome! Please feel free to open an issue or submit a pull request.
+
+## Disclaimer
+
+This is an unofficial, third-party application and is not affiliated with, authorized, or endorsed by Anthropic. Use at your own risk.
