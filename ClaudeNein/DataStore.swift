@@ -6,30 +6,56 @@ import OSLog
 class DataStore {
     static let shared = DataStore()
 
-    let container: NSPersistentContainer
+    let context: NSManagedObjectContext
+
     private let logger = Logger(subsystem: "ClaudeNein", category: "DataStore")
 
     init(inMemory: Bool = false) {
-        guard let modelURL = Bundle.main.url(forResource: "Model", withExtension: "momd"),
-              let model = NSManagedObjectModel(contentsOf: modelURL) else {
-            fatalError("Failed to load Core Data model")
-        }
-        
-        container = NSPersistentContainer(name: "UsageData", managedObjectModel: model)
+        if (inMemory) {
+            // Use Bundle(for: DataStore.self) to ensure we get the bundle containing the Core Data model
+            // This works in both Xcode IDE and command-line test execution
+            let bundle = Bundle(for: DataStore.self)
+            let model: NSManagedObjectModel
+            if let modelURL = bundle.url(forResource: "Model", withExtension: "momd"),
+               let explicitModel = NSManagedObjectModel(contentsOf: modelURL) {
+                model = explicitModel
+            } else if let mergedModel = NSManagedObjectModel.mergedModel(from: [bundle]) {
+                model = mergedModel
+            } else {
+                fatalError("Failed to load Core Data model for in-memory store. Bundle: \(bundle)")
+            }
+            
+            let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+            do {
+                try coordinator.addPersistentStore(
+                    ofType: NSInMemoryStoreType, configurationName: nil, at: nil, options: nil
+                )
+            } catch {
+                fatalError("Error creating test store: \(error)")
+            }
+            context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+            context.persistentStoreCoordinator = coordinator
+        } else {
+            let bundle = Bundle(for: DataStore.self)
+            guard let modelURL = bundle.url(forResource: "Model", withExtension: "momd") else {
+                let bundleContents = bundle.urls(forResourcesWithExtension: "momd", subdirectory: nil) ?? []
+                fatalError("Failed to locate 'Model.momd' in bundle \(bundle). Available .momd files: \(bundleContents)")
+            }
+            
+            guard let model = NSManagedObjectModel(contentsOf: modelURL) else {
+                fatalError("Failed to initialize NSManagedObjectModel from valid URL: \(modelURL.absoluteString). Check if the model file is corrupted.")
+            }
+            
+            let container: NSPersistentContainer = NSPersistentContainer(name: "UsageData", managedObjectModel: model)
+            
+            context = container.viewContext
 
-        if inMemory {
-            container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
-        }
-
-        container.loadPersistentStores { _, error in
-            if let error = error {
-                self.logger.error("Failed to load store: \(error.localizedDescription)")
+            container.loadPersistentStores { _, error in
+                if let error = error {
+                    self.logger.error("Failed to load store: \(error.localizedDescription)")
+                }
             }
         }
-    }
-
-    private var context: NSManagedObjectContext {
-        container.viewContext
     }
 
     /// Insert or update usage entries based on a unique hash
