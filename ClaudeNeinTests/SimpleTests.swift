@@ -12,7 +12,7 @@ struct SimpleTests {
         #expect(tokensNoCached.total == 300)
     }
     
-    @Test func testUsageEntry() {
+    @Test func testUsageEntry() throws {
         let entry = UsageEntry(
             id: "test-1",
             timestamp: Date(),
@@ -21,9 +21,9 @@ struct SimpleTests {
             cost: 1.5
         )
         
-        #expect(entry.id == "test-1")
-        #expect(entry.model == "claude-3-5-sonnet-20241022")
-        #expect(entry.cost == 1.5)
+        try #require(entry.id == "test-1")
+        try #require(entry.model == "claude-3-5-sonnet-20241022")
+        try #require(entry.cost == 1.5)
     }
     
     @Test func testCostModes() {
