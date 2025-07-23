@@ -72,6 +72,14 @@ class HomeDirectoryAccessManager: ObservableObject {
         return homeURL.appendingPathComponent(".claude", isDirectory: true)
     }
     
+    /// Get the URL for the projects directory within the .claude directory
+    var claudeProjectsDirectoryURL: URL? {
+        guard let claudeDir = claudeDirectoryURL else {
+            return nil
+        }
+        return claudeDir.appendingPathComponent("projects", isDirectory: true)
+    }
+    
     /// Revoke access to the home directory
     func revokeAccess() {
         stopAccessingSecuredResource()

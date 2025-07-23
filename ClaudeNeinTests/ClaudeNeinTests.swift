@@ -51,7 +51,7 @@ struct ClaudeNeinTests {
         #expect(entry1 == entry2)
     }
     
-    @Test func testCoreDataUpsert() {
+    @Test func testCoreDataUpsert() async {
         // Create an in-memory DataStore for testing
         let dataStore = DataStore(inMemory: true)
         
@@ -68,7 +68,7 @@ struct ClaudeNeinTests {
         )
         
         // Test upsert
-        dataStore.upsertEntries([entry])
+        await dataStore.upsertEntries([entry])
         
         // Fetch and verify
         let fetchedEntries = dataStore.fetchAllEntries()

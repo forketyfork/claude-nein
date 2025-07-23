@@ -70,38 +70,67 @@ class FileMonitor: ObservableObject {
     // MARK: - Private Setup and Teardown
     
     private func setupDirectoryMonitoring() {
-        guard let claudeDir = accessManager.claudeDirectoryURL else {
-            Logger.fileMonitor.error("Failed to get Claude directory URL.")
+        guard let projectsDir = accessManager.claudeProjectsDirectoryURL else {
+            Logger.fileMonitor.error("Failed to get Claude projects directory URL.")
             return
         }
         
-        monitoredDirectories = [claudeDir]
-        Logger.fileMonitor.info("Starting to monitor directory: \(claudeDir.path)")
-        
-        for directoryURL in monitoredDirectories {
-            let fileDescriptor = open(directoryURL.path, O_EVTONLY)
-            guard fileDescriptor != -1 else {
-                Logger.fileMonitor.error("Failed to open file descriptor for \(directoryURL.path). Error: \(String(cString: strerror(errno)))")
-                continue
-            }
-            
-            let watcher = DispatchSource.makeFileSystemObjectSource(
-                fileDescriptor: fileDescriptor,
-                eventMask: .write,
-                queue: monitorQueue
-            )
-            
-            watcher.setEventHandler { [weak self] in
-                self?.handleFileSystemEvent(in: directoryURL)
-            }
-            
-            watcher.setCancelHandler {
-                close(fileDescriptor)
-            }
-            
-            watcher.resume()
-            directoryWatchers.append(watcher)
+        // Verify the projects directory exists
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: projectsDir.path) else {
+            Logger.fileMonitor.warning("Claude projects directory does not exist: \(projectsDir.path)")
+            return
         }
+        
+        // Start with the main projects directory
+        var directoriesToMonitor = [projectsDir]
+        
+        // Add all existing project subdirectories for monitoring
+        if let enumerator = fileManager.enumerator(at: projectsDir, includingPropertiesForKeys: [.isDirectoryKey]) {
+            for case let url as URL in enumerator {
+                do {
+                    let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey])
+                    if resourceValues.isDirectory == true {
+                        directoriesToMonitor.append(url)
+                    }
+                } catch {
+                    Logger.fileMonitor.warning("Failed to check if \(url.path) is directory: \(error)")
+                }
+            }
+        }
+        
+        monitoredDirectories = directoriesToMonitor
+        Logger.fileMonitor.info("📊 Starting to monitor \(directoriesToMonitor.count) directories under: \(projectsDir.path)")
+        
+        for (index, directoryURL) in monitoredDirectories.enumerated() {
+            Logger.fileMonitor.debug("  \(index + 1). \(directoryURL.lastPathComponent)")
+            setupWatcher(for: directoryURL)
+        }
+    }
+    
+    private func setupWatcher(for directoryURL: URL) {
+        let fileDescriptor = open(directoryURL.path, O_EVTONLY)
+        guard fileDescriptor != -1 else {
+            Logger.fileMonitor.error("Failed to open file descriptor for \(directoryURL.path). Error: \(String(cString: strerror(errno)))")
+            return
+        }
+        
+        let watcher = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fileDescriptor,
+            eventMask: [.write, .rename, .delete],
+            queue: monitorQueue
+        )
+        
+        watcher.setEventHandler { [weak self] in
+            self?.handleFileSystemEvent(in: directoryURL)
+        }
+        
+        watcher.setCancelHandler {
+            close(fileDescriptor)
+        }
+        
+        watcher.resume()
+        directoryWatchers.append(watcher)
     }
     
     private func teardownDirectoryMonitoring() {
@@ -115,38 +144,117 @@ class FileMonitor: ObservableObject {
     // MARK: - Event Handling
     
     private func handleFileSystemEvent(in directoryURL: URL) {
-        // The event gives us the directory, so we need to find which file(s) changed.
-        // A simple approach is to just scan for all .jsonl files and add them to the pending set.
+        Logger.fileMonitor.info("🔍 File system event detected in: \(directoryURL.path)")
+        
         let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(at: directoryURL, includingPropertiesForKeys: nil) else {
-            return
-        }
         
-        let jsonlFiles = enumerator.allObjects
-            .compactMap { $0 as? URL }
-            .filter { $0.pathExtension == "jsonl" }
-        
-        for url in jsonlFiles {
-            pendingChanges.insert(url)
-        }
-        
-        // Debounce the changes to avoid processing too frequently
-        DispatchQueue.main.async {
-            self.debounceTimer?.invalidate()
-            self.debounceTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
-                self?.processPendingChanges()
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey])
+            
+            // Check for JSONL files in this directory
+            let jsonlFiles = contents.filter { 
+                $0.pathExtension == "jsonl" && $0.hasDirectoryPath == false
             }
+            
+            // Check if this is the main projects directory - if so, always check for new subdirectories
+            let isMainProjectsDir = (directoryURL == accessManager.claudeProjectsDirectoryURL)
+            
+            if !jsonlFiles.isEmpty {
+                Logger.fileMonitor.info("📁 Found \(jsonlFiles.count) JSONL files in \(directoryURL.path)")
+                for url in jsonlFiles {
+                    pendingChanges.insert(url)
+                    Logger.fileMonitor.debug("  ➕ Added to pending: \(url.lastPathComponent)")
+                }
+            }
+            
+            // Always check for new directories if this is the main projects directory
+            // or if we found JSONL files (indicating activity)
+            if isMainProjectsDir || !jsonlFiles.isEmpty {
+                checkForNewDirectories()
+            }
+            
+            // Trigger processing if we found files or if this is the main directory (new subdirs might have files)
+            if !jsonlFiles.isEmpty || isMainProjectsDir {
+                // Debounce the changes to avoid processing too frequently
+                DispatchQueue.main.async {
+                    self.debounceTimer?.invalidate()
+                    self.debounceTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
+                        self?.processPendingChanges()
+                    }
+                }
+            }
+            
+        } catch {
+            Logger.fileMonitor.error("Failed to read directory contents for \(directoryURL.path): \(error)")
+        }
+    }
+    
+    /// Check for new project directories and add them to monitoring
+    private func checkForNewDirectories() {
+        guard let projectsDir = accessManager.claudeProjectsDirectoryURL else { return }
+        
+        let fileManager = FileManager.default
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: projectsDir, includingPropertiesForKeys: [.isDirectoryKey])
+            
+            let newDirectories = contents.filter { url in
+                url.hasDirectoryPath && !monitoredDirectories.contains(url)
+            }
+            
+            if !newDirectories.isEmpty {
+                Logger.fileMonitor.info("Found \(newDirectories.count) new project directories to monitor")
+                for newDir in newDirectories {
+                    monitoredDirectories.append(newDir)
+                    setupWatcher(for: newDir)
+                    
+                    // Immediately check for existing JSONL files in the new directory
+                    scanDirectoryForJSONLFiles(newDir)
+                }
+            }
+            
+        } catch {
+            Logger.fileMonitor.error("Failed to check for new directories: \(error)")
+        }
+    }
+    
+    /// Scan a directory for JSONL files and add them to pending changes
+    private func scanDirectoryForJSONLFiles(_ directoryURL: URL) {
+        let fileManager = FileManager.default
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: [.isRegularFileKey])
+            
+            let jsonlFiles = contents.filter { 
+                $0.pathExtension == "jsonl" && $0.hasDirectoryPath == false
+            }
+            
+            if !jsonlFiles.isEmpty {
+                Logger.fileMonitor.info("📂 Found \(jsonlFiles.count) existing JSONL files in new directory: \(directoryURL.path)")
+                for url in jsonlFiles {
+                    pendingChanges.insert(url)
+                    Logger.fileMonitor.debug("  ➕ Added existing file: \(url.lastPathComponent)")
+                }
+            }
+            
+        } catch {
+            Logger.fileMonitor.warning("Failed to scan new directory for JSONL files: \(directoryURL.path) - \(error)")
         }
     }
     
     private func processPendingChanges() {
         monitorQueue.async { [weak self] in
-            guard let self = self, !self.pendingChanges.isEmpty else { return }
+            guard let self = self, !self.pendingChanges.isEmpty else { 
+                Logger.fileMonitor.debug("No pending changes to process")
+                return 
+            }
             
             let urlsToProcess = Array(self.pendingChanges)
             self.pendingChanges.removeAll()
             
-            Logger.fileMonitor.info("Processing changes for \(urlsToProcess.count) file(s).")
+            Logger.fileMonitor.info("🚀 Processing changes for \(urlsToProcess.count) file(s):")
+            for url in urlsToProcess {
+                Logger.fileMonitor.info("  📄 \(url.lastPathComponent)")
+            }
+            
             self.fileChangeSubject.send(urlsToProcess)
         }
     }
