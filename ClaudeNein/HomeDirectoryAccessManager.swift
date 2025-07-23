@@ -3,7 +3,7 @@ import AppKit
 import OSLog
 
 /// Manages access to the user's home directory in a sandboxed environment
-class HomeDirectoryAccessManager: ObservableObject {
+class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
     
     // MARK: - Properties
     

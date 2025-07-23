@@ -190,21 +190,16 @@ struct UsageEntry: Codable, Equatable, Hashable {
     }
     
     /// Generate unique hash for deduplication based on available identifiers
+    /// Returns nil if we don't have both requestId and originalMessageId for reliable deduplication
     func uniqueHash() -> String? {
-        // Primary: Use requestId and originalMessageId if both are available
+        // Only use requestId and originalMessageId if both are available for reliable deduplication
         if let requestId = requestId, let originalMessageId = originalMessageId {
             return "\(originalMessageId):\(requestId)"
         }
         
-        // Fallback 1: Use just originalMessageId if available
-        if let originalMessageId = originalMessageId {
-            return "msg:\(originalMessageId)"
-        }
-        
-        // Fallback 2: Use timestamp + model + token counts as unique identifier
-        let timestampStr = String(Int(timestamp.timeIntervalSince1970 * 1000)) // milliseconds for precision
-        let tokenStr = "\(tokenCounts.input):\(tokenCounts.output)"
-        return "ts:\(timestampStr):\(model):\(tokenStr)"
+        // Return nil if we don't have both identifiers - entries without both will not be deduplicated
+        // This is safer than using fallback hashes that might not be truly unique
+        return nil
     }
     
     /// Implement Hashable protocol
