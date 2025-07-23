@@ -16,8 +16,8 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [x] Create new macOS app project in Xcode
 - [x] Configure Info.plist for menu bar app (LSUIElement = true)
 - [x] Set up basic SwiftUI app structure with MenuBarApp lifecycle
-- [ ] Create app icon and menu bar icon assets
-- [ ] Set up project structure with organized folders
+- [x] Create app icon and menu bar icon assets
+- [x] Set up project structure with organized folders
 
 ### Phase 2: Data Models & Core Logic
 - [x] Create Swift data models for Claude Code usage data:
@@ -34,6 +34,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Implement recursive JSONL file discovery
   - [x] Support custom config directory via environment variable
   - [x] Persist parsed usage entries to Core Data database
+  - [x] Fix database schema and upsert logic for proper deduplication
 
 ### Phase 3: Cost Calculation Engine
 - [x] Create `PricingManager` class:

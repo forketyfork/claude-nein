@@ -109,3 +109,6 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+
+# Env variables
+.env

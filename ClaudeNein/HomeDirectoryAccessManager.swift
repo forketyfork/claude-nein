@@ -29,6 +29,10 @@ class HomeDirectoryAccessManager: ObservableObject {
     /// - Returns: True if access was granted, false otherwise
     @discardableResult
     func requestHomeDirectoryAccess() async -> Bool {
+        if hasValidAccess {
+            return true
+        }
+
         await MainActor.run {
             isRequestingAccess = true
         }
@@ -58,6 +62,14 @@ class HomeDirectoryAccessManager: ObservableObject {
     func getSecuredHomeDirectoryURL() -> URL? {
         guard hasValidAccess else { return nil }
         return securedURL
+    }
+    
+    /// Get the URL for the .claude directory within the home directory
+    var claudeDirectoryURL: URL? {
+        guard hasValidAccess, let homeURL = getSecuredHomeDirectoryURL() else {
+            return nil
+        }
+        return homeURL.appendingPathComponent(".claude", isDirectory: true)
     }
     
     /// Revoke access to the home directory

@@ -51,6 +51,41 @@ struct ClaudeNeinTests {
         #expect(entry1 == entry2)
     }
     
+    @Test func testCoreDataUpsert() {
+        // Create an in-memory DataStore for testing
+        let dataStore = DataStore(inMemory: true)
+        
+        // Create test entries with cache tokens
+        let entry = UsageEntry(
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: TokenCounts(input: 100, output: 200, cacheCreation: 50, cacheRead: 25),
+            cost: 1.5,
+            sessionId: "test-session",
+            projectPath: "/test/path",
+            requestId: "req-123",
+            originalMessageId: "msg-456"
+        )
+        
+        // Test upsert
+        dataStore.upsertEntries([entry])
+        
+        // Fetch and verify
+        let fetchedEntries = dataStore.fetchAllEntries()
+        #expect(fetchedEntries.count == 1)
+        
+        let fetchedEntry = fetchedEntries[0]
+        #expect(fetchedEntry.model == "claude-3-5-sonnet-20241022")
+        #expect(fetchedEntry.tokenCounts.input == 100)
+        #expect(fetchedEntry.tokenCounts.output == 200)
+        #expect(fetchedEntry.tokenCounts.cacheCreation == 50)
+        #expect(fetchedEntry.tokenCounts.cacheRead == 25)
+        #expect(fetchedEntry.cost == 1.5)
+        #expect(fetchedEntry.sessionId == "test-session")
+        #expect(fetchedEntry.requestId == "req-123")
+        #expect(fetchedEntry.originalMessageId == "msg-456")
+    }
+    
     
 }
 
@@ -61,20 +96,20 @@ struct JSONLParserTests {
     @Test func testValidJSONLParsing() {
         let parser = JSONLParser()
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}, "costUSD": 1.5}
-        {"id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100, "cache_read_input_tokens": 25}, "costUSD": 0.5}
+        {"type": "assistant", "id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}, "costUSD": 1.5}
+        {"type": "assistant", "id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100, "cache_read_input_tokens": 25}, "costUSD": 0.5}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
         #expect(entries.count == 2)
-        #expect(entries[0].id == "test-1")
+        #expect(entries[0].originalMessageId == "test-1")
         #expect(entries[0].model == "claude-3-5-sonnet-20241022")
         #expect(entries[0].tokenCounts.input == 100)
         #expect(entries[0].tokenCounts.output == 200)
         #expect(entries[0].cost == 1.5)
         
-        #expect(entries[1].id == "test-2")
+        #expect(entries[1].originalMessageId == "test-2")
         #expect(entries[1].model == "claude-3-5-haiku-20241022")
         #expect(entries[1].tokenCounts.cached == 25)
     }
@@ -82,9 +117,9 @@ struct JSONLParserTests {
     @Test func testMalformedJSONLHandling() {
         let parser = JSONLParser()
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
+        {"type": "assistant", "id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
         invalid json line
-        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
+        {"type": "assistant", "id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
         {"incomplete": "data"
         """
         
@@ -92,26 +127,26 @@ struct JSONLParserTests {
         
         // Should successfully parse valid entries and skip malformed ones
         #expect(entries.count == 2)
-        #expect(entries[0].id == "test-1")
-        #expect(entries[1].id == "test-2")
+        #expect(entries[0].originalMessageId == "test-1")
+        #expect(entries[1].originalMessageId == "test-2")
     }
     
     @Test func testEmptyAndWhitespaceLines() {
         let parser = JSONLParser()
         let jsonlContent = """
         
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
+        {"type": "assistant", "id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
         
         
-        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
+        {"type": "assistant", "id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
         
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
         #expect(entries.count == 2)
-        #expect(entries[0].id == "test-1")
-        #expect(entries[1].id == "test-2")
+        #expect(entries[0].originalMessageId == "test-1")
+        #expect(entries[1].originalMessageId == "test-2")
     }
     
     @Test func testDeduplicationFunctionality() {
@@ -142,7 +177,7 @@ struct JSONLParserTests {
             model: "claude-3-5-sonnet-20241022",
             tokenCounts: TokenCounts(input: 100, output: 200),
             requestId: "req-123",
-            messageId: "msg-456"
+            originalMessageId: "msg-456"
         )
         
         let entry2 = UsageEntry(
@@ -151,7 +186,7 @@ struct JSONLParserTests {
             model: "claude-3-5-sonnet-20241022",
             tokenCounts: TokenCounts(input: 100, output: 200),
             requestId: "req-123",
-            messageId: "msg-456"
+            originalMessageId: "msg-456"
         )
         
         let entry3 = UsageEntry(
@@ -160,7 +195,7 @@ struct JSONLParserTests {
             model: "claude-3-5-sonnet-20241022",
             tokenCounts: TokenCounts(input: 100, output: 200),
             requestId: nil,
-            messageId: "msg-456"
+            originalMessageId: "msg-456"
         )
         
         // Same request and message IDs should produce same hash with new format
@@ -225,7 +260,7 @@ struct JSONLParserTests {
         #expect(entry1.tokenCounts.cached == 300) // 100 + 200
         #expect(entry1.cost == 15.5)
         #expect(entry1.requestId == "req-123")
-        #expect(entry1.messageId == "msg-456")
+        #expect(entry1.originalMessageId == "msg-456")
         
         // Second entry - minimal schema
         let entry2 = entries[1]
@@ -254,10 +289,10 @@ struct JSONLParserTests {
         
         // Test that invalid lines are silently skipped without causing errors
         let jsonlContent = """
-        {"timestamp": "2024-07-21T10:00:00Z", "message": {"model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:00:00Z", "message": {"model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
         {invalid json without proper structure
         {"timestamp": "invalid-timestamp", "message": {"model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}}
-        {"timestamp": "2024-07-21T10:02:00Z", "message": {"model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:02:00Z", "message": {"model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
@@ -266,6 +301,65 @@ struct JSONLParserTests {
         #expect(entries.count == 2)
         #expect(entries[0].model == "claude-3-5-sonnet-20241022")
         #expect(entries[1].model == "claude-3-opus-20240229")
+    }
+    
+    @Test func testEntryTypeFiltering() {
+        let parser = JSONLParser()
+        
+        // Test that only assistant entries with usage data are parsed
+        let jsonlContent = """
+        {"type": "user", "timestamp": "2024-07-21T10:00:00Z", "message": {"role": "user", "content": [{"type": "text", "text": "Hello"}]}, "uuid": "user-uuid-1"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:01:00Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}, "requestId": "req-123"}
+        {"type": "summary", "timestamp": "2024-07-21T10:02:00Z", "summary": "This is a summary", "leafUuid": "leaf-uuid"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:03:00Z", "message": {"id": "msg-2", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}, "requestId": "req-456"}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        // Should only parse the 2 assistant entries, ignoring user and summary entries
+        #expect(entries.count == 2)
+        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
+        #expect(entries[0].originalMessageId == "msg-1")
+        #expect(entries[0].requestId == "req-123")
+        #expect(entries[1].model == "claude-3-5-haiku-20241022")
+        #expect(entries[1].originalMessageId == "msg-2")
+        #expect(entries[1].requestId == "req-456")
+    }
+    
+    @Test func testAssistantEntryWithoutUsageData() {
+        let parser = JSONLParser()
+        
+        // Test assistant entry that doesn't have usage data (should be filtered out)
+        let jsonlContent = """
+        {"type": "assistant", "timestamp": "2024-07-21T10:01:00Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "content": [{"type": "text", "text": "Hello"}]}, "requestId": "req-123"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:02:00Z", "message": {"id": "msg-2", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}, "requestId": "req-456"}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        // Should only parse the entry with usage data
+        #expect(entries.count == 1)
+        #expect(entries[0].model == "claude-3-5-haiku-20241022")
+        #expect(entries[0].originalMessageId == "msg-2")
+        #expect(entries[0].requestId == "req-456")
+    }
+    
+    @Test func testUserEntryWithToolResults() {
+        let parser = JSONLParser()
+        
+        // Test the specific user entry format from the error message
+        let jsonlContent = """
+        {"parentUuid":"9d3120af-7075-4338-81ac-f0cc7d2a6d8d","isSidechain":true,"userType":"external","cwd":"/Users/sergei.petunin/dev/jb/CodeCanvas/codecanvas","sessionId":"1af9c387-f946-4ff7-aea2-9714ca69348b","version":"1.0.35","type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01PbVyEXoVzfzUEAB1QDaTDS","type":"tool_result","content":"No files found"}]},"uuid":"9e3f02a5-5a9a-4307-9de0-c335e58f7847","timestamp":"2025-06-26T11:14:58.178Z","toolUseResult":{"filenames":[],"numFiles":0}}
+        {"type": "assistant", "timestamp": "2025-06-26T11:15:00Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}, "requestId": "req-123"}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        // Should only parse the assistant entry, ignoring the user entry with tool results
+        #expect(entries.count == 1)
+        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
+        #expect(entries[0].originalMessageId == "msg-1")
+        #expect(entries[0].requestId == "req-123")
     }
     
     @Test func testChronologicalFileSorting() {
@@ -628,7 +722,7 @@ struct SpendCalculatorTests {
         let calculator = SpendCalculator()
         let calendar = Calendar.current
         let endDate = Date()
-        let startDate = calendar.date(byAdding: .day, value: -3, to: endDate)!
+        let startDate = calendar.date(byAdding: .day, value: -3, to: endDate)!;
         
         // Create entries within and outside the range
         let inRangeEntry1 = createTestEntry(id: "in-1", timestamp: startDate, cost: 1.0)
@@ -745,130 +839,21 @@ struct ErrorHandlingTests {
 
 struct FileMonitorTests {
     
-    @Test func testFileStateCreation() {
-        // Create a temporary file for testing
-        let tempDir = FileManager.default.temporaryDirectory
-        let testFile = tempDir.appendingPathComponent("test_file_\(UUID().uuidString).txt")
-        
-        // Write test content to file
-        let testContent = "test content"
-        try? testContent.write(to: testFile, atomically: true, encoding: .utf8)
-        
-        // Test FileState creation
-        let fileState = FileMonitor.FileState.create(from: testFile)
-        
-        #expect(fileState != nil)
-        #expect(fileState?.url == testFile)
-        #expect((fileState?.size ?? 0) > 0)
-        
-        // Clean up
-        try? FileManager.default.removeItem(at: testFile)
-    }
-    
-    @Test func testFileStateCreationWithNonexistentFile() {
-        let nonexistentFile = URL(fileURLWithPath: "/nonexistent/path/file.txt")
-        let fileState = FileMonitor.FileState.create(from: nonexistentFile)
-        
-        #expect(fileState == nil)
-    }
-    
     @Test func testFileMonitorInitialization() {
-        let fileMonitor = FileMonitor()
+        let accessManager = HomeDirectoryAccessManager()
+        let fileMonitor = FileMonitor(accessManager: accessManager)
         
         #expect(fileMonitor.isMonitoring == false)
-        #expect(fileMonitor.getCachedEntries().isEmpty)
-    }
-    
-    @Test func testFileChangeNotificationStructure() {
-        let testFiles = [
-            URL(fileURLWithPath: "/test/file1.jsonl"),
-            URL(fileURLWithPath: "/test/file2.jsonl")
-        ]
-        
-        let notification = FileMonitor.FileChangeNotification(
-            changedFiles: testFiles,
-            timestamp: Date()
-        )
-        
-        #expect(notification.changedFiles.count == 2)
-        #expect(notification.changedFiles[0].path == "/test/file1.jsonl")
-        #expect(notification.changedFiles[1].path == "/test/file2.jsonl")
-    }
-    
-    @Test func testFileMonitorErrorTypes() {
-        let permissionError = FileMonitor.FileMonitorError.permissionDenied(path: "/restricted/path")
-        let fileNotFoundError = FileMonitor.FileMonitorError.fileNotFound(path: "/missing/file")
-        let diskFullError = FileMonitor.FileMonitorError.diskFull
-        let corruptedFileError = FileMonitor.FileMonitorError.corruptedFile(path: "/bad/file")
-        let networkError = FileMonitor.FileMonitorError.networkError(path: "/network/path")
-        let unknownError = FileMonitor.FileMonitorError.unknownError(underlying: NSError(domain: "test", code: 1))
-        
-        #expect(permissionError.errorDescription?.contains("Permission denied") == true)
-        #expect(fileNotFoundError.errorDescription?.contains("File not found") == true)
-        #expect(diskFullError.errorDescription?.contains("Disk is full") == true)
-        #expect(corruptedFileError.errorDescription?.contains("corrupted") == true)
-        #expect(networkError.errorDescription?.contains("Network") == true)
-        #expect(unknownError.errorDescription?.contains("Unknown error") == true)
-    }
-    
-    @Test func testClearCacheOperation() {
-        let fileMonitor = FileMonitor()
-        
-        // Initially, cache should be empty
-        #expect(fileMonitor.getCachedEntries().isEmpty)
-        
-        // Clear cache should not cause any issues when empty
-        fileMonitor.clearCache()
-        #expect(fileMonitor.getCachedEntries().isEmpty)
-    }
-    
-    @Test func testGetModifiedEntriesWithEmptyCache() {
-        let fileMonitor = FileMonitor()
-        let testDate = Date()
-        
-        let modifiedEntries = fileMonitor.getModifiedEntries(since: testDate)
-        #expect(modifiedEntries.isEmpty)
     }
     
     @Test func testFileMonitorPublisherSetup() {
-        let fileMonitor = FileMonitor()
+        let accessManager = HomeDirectoryAccessManager()
+        let fileMonitor = FileMonitor(accessManager: accessManager)
         
         // Test that fileChanges publisher is accessible
         let publisher = fileMonitor.fileChanges
         
         // Verify publisher type
-        #expect(publisher is AnyPublisher<FileMonitor.FileChangeNotification, Never>)
-    }
-    
-    @Test func testFileMonitorThreadSafety() {
-        let fileMonitor = FileMonitor()
-        var results: [Int] = []
-        let resultsLock = NSLock()
-        
-        // Simulate concurrent access to getCachedEntries
-        DispatchQueue.concurrentPerform(iterations: 10) { index in
-            let entries = fileMonitor.getCachedEntries()
-            resultsLock.lock()
-            results.append(entries.count)
-            resultsLock.unlock()
-        }
-        
-        // All concurrent calls should complete successfully
-        #expect(results.count == 10)
-        
-        // All results should be the same (empty cache)
-        let uniqueResults = Set(results)
-        #expect(uniqueResults.count == 1)
-        #expect(uniqueResults.first == 0)
-    }
-    
-    @Test func testFileMonitorForceRefresh() {
-        let fileMonitor = FileMonitor()
-        
-        // Force refresh should not crash when no monitoring is active
-        fileMonitor.forceRefresh()
-        
-        // Cache should still be empty
-        #expect(fileMonitor.getCachedEntries().isEmpty)
+        #expect(publisher is AnyPublisher<[URL], Never>)
     }
 }

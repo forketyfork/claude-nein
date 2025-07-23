@@ -23,31 +23,59 @@ struct ClaudeNeinApp: App {
 
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
-    private let fileMonitor = FileMonitor()
+    
     private var cancellables = Set<AnyCancellable>()
     
     @Published private var currentSummary = SpendSummary.empty
     
+    private let fileMonitor: FileMonitor
+    private let homeDirectoryAccessManager: HomeDirectoryAccessManager
+    private let dataStore = DataStore.shared
+    
     init() {
         Logger.app.info("🚀 Initializing ClaudeNein MenuBarManager")
+        self.homeDirectoryAccessManager = HomeDirectoryAccessManager()
+        self.fileMonitor = FileMonitor(accessManager: homeDirectoryAccessManager)
+        
         setupMenuBar()
-        setupFileMonitoring()
-        initializePricingData()
+        setupStateSubscriptions()
+        
+        // Start the main asynchronous initialization
+        Task {
+            await initializeSystem()
+        }
+        
         Logger.app.info("✅ ClaudeNein MenuBarManager initialized successfully")
     }
     
-    private func initializePricingData() {
-        Logger.app.debug("💰 Starting pricing data initialization")
-        Task {
-            await PricingManager.shared.initializePricingData()
-            Logger.app.info("💰 Pricing data initialization completed")
+    private func initializeSystem() async {
+        // 1. Load initial data from the database for immediate UI display
+        await MainActor.run {
+            self.currentSummary = dataStore.fetchSpendSummary()
+            Logger.app.info("📊 Initial spend summary loaded from database.")
         }
+        
+        // 2. Initialize pricing data
+        await PricingManager.shared.initializePricingData()
+        Logger.app.info("💰 Pricing data initialization completed.")
+        
+        // 3. Request access and perform initial full scan of JSONL files
+        let accessGranted = await homeDirectoryAccessManager.requestHomeDirectoryAccess()
+        if accessGranted {
+            Logger.app.info("✅ Access granted. Starting initial data processing.")
+            await processAllJsonlFiles()
+        } else {
+            Logger.app.warning("⚠️ Access to home directory not granted. Functionality will be limited.")
+        }
+        
+        // 4. Start monitoring for file changes
+        await fileMonitor.startMonitoring()
+        Logger.fileMonitor.info("🔍 File monitoring started.")
     }
     
     deinit {
         Logger.app.info("🛑 Deinitializing MenuBarManager")
         statusItem = nil
-        fileMonitor.stopMonitoring()
         Logger.app.info("✅ MenuBarManager deinitialized")
     }
     
@@ -55,9 +83,9 @@ class MenuBarManager: ObservableObject {
         Logger.menuBar.debug("🔧 Setting up menu bar")
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
-        guard let statusButton = statusItem?.button else { 
+        guard let statusButton = statusItem?.button else {
             Logger.menuBar.error("❌ Failed to get status button from status item")
-            return 
+            return
         }
         
         updateStatusBarTitle()
@@ -68,15 +96,18 @@ class MenuBarManager: ObservableObject {
         Logger.menuBar.info("✅ Menu bar setup completed")
     }
     
-    private func setupFileMonitoring() {
-        Logger.fileMonitor.debug("🔧 Setting up file monitoring")
+    private func setupStateSubscriptions() {
+        Logger.fileMonitor.debug("🔧 Setting up state subscriptions")
         
-        // Subscribe to file changes
+        // Subscribe to file changes from the monitor
         fileMonitor.fileChanges
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] notification in
-                Logger.fileMonitor.info("📁 File changes detected: \(notification.changedFiles.count) files")
-                self?.refreshSpendingSummary()
+            .receive(on: DispatchQueue.global(qos: .background))
+            .sink { [weak self] changedFiles in
+                guard let self = self else { return }
+                Logger.fileMonitor.info("🔄 File changes detected for: \(changedFiles.map { $0.lastPathComponent })")
+                Task {
+                    await self.processChangedFiles(changedFiles)
+                }
             }
             .store(in: &cancellables)
         
@@ -89,29 +120,6 @@ class MenuBarManager: ObservableObject {
                 self?.updateMenu()
             }
             .store(in: &cancellables)
-        
-        // Subscribe to home directory access changes
-        fileMonitor.homeDirectoryAccessManager.$hasAccess
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] hasAccess in
-                Logger.security.info("🔒 Home directory access changed: \(hasAccess)")
-                self?.updateMenu()
-                if hasAccess {
-                    Task {
-                        await self?.fileMonitor.startMonitoring()
-                    }
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Start monitoring asynchronously
-        Task {
-            await fileMonitor.startMonitoring()
-            await MainActor.run {
-                refreshSpendingSummary()
-                Logger.fileMonitor.info("✅ File monitoring setup completed")
-            }
-        }
     }
     
     private func setupMenu() {
@@ -162,31 +170,19 @@ class MenuBarManager: ObservableObject {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Home directory access status
-        let accessManager = fileMonitor.homeDirectoryAccessManager
-        if accessManager.hasValidAccess {
-            let accessItem = NSMenuItem(title: "✅ Home Directory Access: Granted", action: nil, keyEquivalent: "")
-            accessItem.isEnabled = false
-            menu.addItem(accessItem)
-            
-            let revokeItem = NSMenuItem(title: "Revoke Access", action: #selector(revokeAccess), keyEquivalent: "")
-            revokeItem.target = self
-            menu.addItem(revokeItem)
-        } else {
-            let accessItem = NSMenuItem(title: "❌ Home Directory Access: Required", action: nil, keyEquivalent: "")
-            accessItem.isEnabled = false
-            menu.addItem(accessItem)
-            
-            let grantItem = NSMenuItem(title: "Grant Access...", action: #selector(requestAccess), keyEquivalent: "")
-            grantItem.target = self
-            menu.addItem(grantItem)
-        }
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        let refreshItem = NSMenuItem(title: "Refresh", action: #selector(refreshData), keyEquivalent: "r")
+        let refreshItem = NSMenuItem(title: "Refresh Data", action: #selector(refreshData), keyEquivalent: "r")
         refreshItem.target = self
         menu.addItem(refreshItem)
+        
+        let reloadDatabaseItem = NSMenuItem(title: "Reload Database", action: #selector(reloadDatabase), keyEquivalent: "")
+        reloadDatabaseItem.target = self
+        menu.addItem(reloadDatabaseItem)
+        
+        let accessItemTitle = homeDirectoryAccessManager.hasValidAccess ? "Revoke Home Directory Access" : "Grant Home Directory Access"
+        let accessAction = homeDirectoryAccessManager.hasValidAccess ? #selector(revokeAccess) : #selector(requestAccess)
+        let accessItem = NSMenuItem(title: accessItemTitle, action: accessAction, keyEquivalent: "")
+        accessItem.target = self
+        menu.addItem(accessItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -203,22 +199,47 @@ class MenuBarManager: ObservableObject {
     
     @objc private func refreshData() {
         Logger.app.info("🔄 Manual refresh requested")
-        fileMonitor.forceRefresh()
-        refreshSpendingSummary()
+        Task {
+            await processAllJsonlFiles()
+        }
+    }
+    
+    @objc private func reloadDatabase() {
+        Logger.app.info("🗑️ Database reload requested")
+        
+        // Show confirmation dialog
+        let alert = NSAlert()
+        alert.messageText = "Reload Database"
+        alert.informativeText = "The database will be cleaned and reloaded from scratch. Proceed?"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Proceed")
+        alert.addButton(withTitle: "Cancel")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            Logger.app.info("✅ User confirmed database reload")
+            Task {
+                await performDatabaseReload()
+            }
+        } else {
+            Logger.app.info("❌ User cancelled database reload")
+        }
     }
     
     @objc private func requestAccess() {
         Logger.security.info("🔒 User requested home directory access")
         Task {
-            let granted = await fileMonitor.homeDirectoryAccessManager.requestHomeDirectoryAccess()
+            let granted = await homeDirectoryAccessManager.requestHomeDirectoryAccess()
+            if granted {
+                await processAllJsonlFiles()
+            }
             Logger.security.info("🔒 Home directory access request result: \(granted)")
         }
     }
     
     @objc private func revokeAccess() {
         Logger.security.info("🚫 User requested to revoke home directory access")
-        fileMonitor.homeDirectoryAccessManager.revokeAccess()
-        fileMonitor.stopMonitoring()
+        homeDirectoryAccessManager.revokeAccess()
     }
     
     @objc private func quitApp() {
@@ -226,11 +247,76 @@ class MenuBarManager: ObservableObject {
         NSApplication.shared.terminate(nil)
     }
     
-    // MARK: - Private Helper Methods
+    // MARK: - Data Processing Methods
+    
+    private func performDatabaseReload() async {
+        Logger.app.info("🗑️ Starting database reload process")
+        
+        // 1. Clear all entries from the database
+        dataStore.clearAllEntries()
+        
+        // 2. Reset UI to show empty data immediately
+        await MainActor.run {
+            self.currentSummary = SpendSummary.empty
+        }
+        
+        // 3. Reload all JSONL files from scratch
+        await processAllJsonlFiles()
+        
+        Logger.app.info("✅ Database reload completed")
+    }
+    
+    private func processAllJsonlFiles() async {
+        guard let claudeDir = homeDirectoryAccessManager.claudeDirectoryURL else {
+            Logger.app.error("❌ Cannot access Claude directory.")
+            return
+        }
+        
+        Logger.app.info("🔍 Starting full scan of .jsonl files in \(claudeDir.path)")
+        
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(at: claudeDir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) else {
+            Logger.app.error("❌ Failed to create directory enumerator.")
+            return
+        }
+        
+        let jsonlFiles = enumerator.allObjects.compactMap { $0 as? URL }.filter { $0.pathExtension == "jsonl" }
+        
+        await processChangedFiles(jsonlFiles)
+    }
+    
+    private func processChangedFiles(_ urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+        
+        Logger.parser.info("Parsing \(urls.count) file(s)...")
+        
+        var allEntries: [UsageEntry] = []
+        let parser = JSONLParser()
+        
+        for url in urls {
+            do {
+                let entries = try await parser.parse(fileURL: url)
+                allEntries.append(contentsOf: entries)
+            } catch {
+                Logger.parser.error("❌ Failed to parse file \(url.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        
+        guard !allEntries.isEmpty else {
+            Logger.parser.warning("⚠️ No new valid entries found in the provided files.")
+            return
+        }
+        
+        Logger.dataStore.info("Upserting \(allEntries.count) entries into the database.")
+        await dataStore.upsertEntries(allEntries)
+        
+        // After upserting, refresh the summary from the database
+        refreshSpendingSummary()
+    }
     
     private func refreshSpendingSummary() {
         Logger.calculator.logTiming("Spending summary calculation") {
-            let newSummary = DataStore.shared.fetchSpendSummary()
+            let newSummary = dataStore.fetchSpendSummary()
             DispatchQueue.main.async { [weak self] in
                 self?.currentSummary = newSummary
                 Logger.calculator.info("💰 Updated spend summary - Today: $\(String(format: "%.2f", newSummary.todaySpend))")
@@ -238,10 +324,12 @@ class MenuBarManager: ObservableObject {
         }
     }
     
+    // MARK: - Private Helper Methods
+    
     private func updateStatusBarTitle() {
-        guard let statusButton = statusItem?.button else { 
+        guard let statusButton = statusItem?.button else {
             Logger.menuBar.error("❌ Cannot update status bar title - no status button")
-            return 
+            return
         }
         let title = formatCurrency(currentSummary.todaySpend)
         statusButton.title = title

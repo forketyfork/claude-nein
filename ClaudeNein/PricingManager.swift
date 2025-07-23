@@ -49,7 +49,6 @@ class PricingManager {
     /// Get current pricing data, using cache if available
     func getCurrentPricing() -> ModelPricing {
         if let cached = cachedPricing, !isCacheExpired() {
-            Logger.calculator.debug("📊 Using \(self.dataSource.description) pricing data (\(cached.models.count) models)")
             return cached
         }
         

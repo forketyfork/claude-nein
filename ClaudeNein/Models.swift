@@ -153,30 +153,31 @@ enum CostMode {
 
 /// Represents a single usage entry from Claude Code JSONL files
 struct UsageEntry: Codable, Equatable, Hashable {
-    let id: String
+    let id: String // Unique ID for Core Data, always UUID
     let timestamp: Date
     let model: String
     let tokenCounts: TokenCounts
     let cost: Double?
     let sessionId: String?
     let projectPath: String?
-    let requestId: String?  // For deduplication
-    let messageId: String?  // For deduplication
+    let requestId: String?
+    let originalMessageId: String? // The original messageId from the JSONL for deduplication
     
     enum CodingKeys: String, CodingKey {
-        case id
         case timestamp
         case model
         case tokenCounts = "token_counts"
         case cost = "costUSD"
-        case sessionId = "session_id"
+        case sessionId = "sessionId"
         case projectPath = "project_path"
         case requestId = "requestId"
-        case messageId
+        case originalMessageId = "messageId" // Map messageId from JSONL to originalMessageId
+        case message // For nested structure
+        case type // For filtering entry types
     }
     
     // Regular memberwise initializer for testing and direct creation
-    init(id: String, timestamp: Date, model: String, tokenCounts: TokenCounts, cost: Double? = nil, sessionId: String? = nil, projectPath: String? = nil, requestId: String? = nil, messageId: String? = nil) {
+    init(id: String = UUID().uuidString, timestamp: Date, model: String, tokenCounts: TokenCounts, cost: Double? = nil, sessionId: String? = nil, projectPath: String? = nil, requestId: String? = nil, originalMessageId: String? = nil) {
         self.id = id
         self.timestamp = timestamp
         self.model = model
@@ -185,13 +186,25 @@ struct UsageEntry: Codable, Equatable, Hashable {
         self.sessionId = sessionId
         self.projectPath = projectPath
         self.requestId = requestId
-        self.messageId = messageId
+        self.originalMessageId = originalMessageId
     }
     
-    /// Generate unique hash for deduplication based on request and message IDs
+    /// Generate unique hash for deduplication based on available identifiers
     func uniqueHash() -> String? {
-        guard let requestId = requestId, let messageId = messageId else { return nil }
-        return "\(messageId):\(requestId)"
+        // Primary: Use requestId and originalMessageId if both are available
+        if let requestId = requestId, let originalMessageId = originalMessageId {
+            return "\(originalMessageId):\(requestId)"
+        }
+        
+        // Fallback 1: Use just originalMessageId if available
+        if let originalMessageId = originalMessageId {
+            return "msg:\(originalMessageId)"
+        }
+        
+        // Fallback 2: Use timestamp + model + token counts as unique identifier
+        let timestampStr = String(Int(timestamp.timeIntervalSince1970 * 1000)) // milliseconds for precision
+        let tokenStr = "\(tokenCounts.input):\(tokenCounts.output)"
+        return "ts:\(timestampStr):\(model):\(tokenStr)"
     }
     
     /// Implement Hashable protocol
@@ -199,19 +212,47 @@ struct UsageEntry: Codable, Equatable, Hashable {
         hasher.combine(id)
         hasher.combine(timestamp)
         hasher.combine(model)
+        // Include originalMessageId and requestId in hash for better deduplication
+        hasher.combine(originalMessageId)
+        hasher.combine(requestId)
     }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        id = try container.decode(String.self, forKey: .id)
-        model = try container.decode(String.self, forKey: .model)
-        tokenCounts = try container.decode(TokenCounts.self, forKey: .tokenCounts)
+        // Check if this is an assistant entry with usage data - only these should be decoded as UsageEntry
+        let entryType = try? container.decode(String.self, forKey: .type)
+        guard entryType == "assistant" else {
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Only assistant entries with usage data can be decoded as UsageEntry")
+        }
+        
+        // Generate a new UUID for the id to ensure uniqueness for Core Data
+        id = UUID().uuidString
+        
+        // Try to get model and usage from nested message structure first, then fall back to flat structure
+        if let messageContainer = try? container.nestedContainer(keyedBy: MessageCodingKeys.self, forKey: .message),
+           messageContainer.contains(.model), messageContainer.contains(.usage) {
+            // Extract from nested message structure
+            model = try messageContainer.decode(String.self, forKey: .model)
+            let usage = try messageContainer.decode(ClaudeUsage.self, forKey: .usage)
+            tokenCounts = TokenCounts(
+                input: usage.inputTokens ?? 0,
+                output: usage.outputTokens ?? 0,
+                cacheCreation: usage.cacheCreationInputTokens,
+                cacheRead: usage.cacheReadInputTokens
+            )
+            originalMessageId = try? messageContainer.decode(String.self, forKey: .originalMessageId)
+        } else {
+            // Fall back to flat structure
+            model = try container.decode(String.self, forKey: .model)
+            tokenCounts = try container.decode(TokenCounts.self, forKey: .tokenCounts)
+            originalMessageId = try container.decodeIfPresent(String.self, forKey: .originalMessageId)
+        }
+        
         cost = try container.decodeIfPresent(Double.self, forKey: .cost)
         sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
         projectPath = try container.decodeIfPresent(String.self, forKey: .projectPath)
         requestId = try container.decodeIfPresent(String.self, forKey: .requestId)
-        messageId = try container.decodeIfPresent(String.self, forKey: .messageId)
         
         // Handle various timestamp formats
         if let timestampString = try? container.decode(String.self, forKey: .timestamp) {
@@ -221,8 +262,25 @@ struct UsageEntry: Codable, Equatable, Hashable {
         } else if let timestampDouble = try? container.decode(Double.self, forKey: .timestamp) {
             timestamp = Date(timeIntervalSince1970: timestampDouble)
         } else {
-            timestamp = Date()
+            throw DecodingError.dataCorruptedError(forKey: .timestamp, in: container, debugDescription: "Timestamp is not in a recognized format.")
         }
+    }
+    
+    private enum MessageCodingKeys: String, CodingKey {
+        case model, usage
+        case originalMessageId = "id"
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(model, forKey: .model)
+        try container.encode(tokenCounts, forKey: .tokenCounts)
+        try container.encodeIfPresent(cost, forKey: .cost)
+        try container.encodeIfPresent(sessionId, forKey: .sessionId)
+        try container.encodeIfPresent(projectPath, forKey: .projectPath)
+        try container.encodeIfPresent(requestId, forKey: .requestId)
+        try container.encodeIfPresent(originalMessageId, forKey: .originalMessageId)
     }
 }
 
