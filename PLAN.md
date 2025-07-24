@@ -197,13 +197,13 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - Proper cleanup of file monitors and timers
 
 ## Success Criteria
-- [ ] App launches and appears in menu bar
-- [ ] Displays accurate today's spend in menu bar icon
-- [ ] Dropdown shows correct breakdowns for today/week/month
-- [ ] Updates in real-time as Claude Code is used
+- [x] App launches and appears in menu bar
+- [x] Displays accurate today's spend in menu bar icon
+- [x] Dropdown shows correct breakdowns for today/week/month
+- [x] Updates in real-time as Claude Code is used
 - [ ] Handles edge cases gracefully without crashing
 - [ ] Minimal performance impact on system
-- [ ] Native macOS look and feel
+- [x] Native macOS look and feel
 
 ## Optional Enhancements (Future)
 - [ ] Notifications for spending thresholds
