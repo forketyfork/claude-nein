@@ -290,6 +290,55 @@ class DataStore {
         return breakdown
     }
 
+    // MARK: - Historical Spend Aggregation
+
+    /// Hourly spend for a given day (24 values)
+    func hourlySpend(for date: Date) -> [Double] {
+        var values = Array(repeating: 0.0, count: 24)
+        context.performAndWait {
+            let cal = Calendar.current
+            let startOfDay = cal.startOfDay(for: date)
+            for hour in 0..<24 {
+                guard let start = cal.date(byAdding: .hour, value: hour, to: startOfDay),
+                      let end = cal.date(byAdding: .hour, value: 1, to: start) else { continue }
+                values[hour] = sumCost(start: start, end: end)
+            }
+        }
+        return values
+    }
+
+    /// Daily spend for the given month
+    func dailySpend(for month: Date) -> [Double] {
+        var values: [Double] = []
+        context.performAndWait {
+            let cal = Calendar.current
+            guard let range = cal.range(of: .day, in: .month, for: month),
+                  let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: month)) else { return }
+            values = Array(repeating: 0.0, count: range.count)
+            for day in range {
+                guard let start = cal.date(byAdding: .day, value: day - 1, to: monthStart),
+                      let end = cal.date(byAdding: .day, value: 1, to: start) else { continue }
+                values[day - 1] = sumCost(start: start, end: end)
+            }
+        }
+        return values
+    }
+
+    /// Monthly spend for the given year
+    func monthlySpend(for year: Date) -> [Double] {
+        var values = Array(repeating: 0.0, count: 12)
+        context.performAndWait {
+            let cal = Calendar.current
+            guard let yearStart = cal.date(from: cal.dateComponents([.year], from: year)) else { return }
+            for monthIndex in 0..<12 {
+                guard let start = cal.date(byAdding: .month, value: monthIndex, to: yearStart),
+                      let end = cal.date(byAdding: .month, value: 1, to: start) else { continue }
+                values[monthIndex] = sumCost(start: start, end: end)
+            }
+        }
+        return values
+    }
+
     // MARK: - Pricing Storage
 
     /// Save fetched pricing data to Core Data
