@@ -32,6 +32,10 @@ class MenuBarManager: ObservableObject {
     private let homeDirectoryAccessManager: HomeDirectoryAccessManager
     private let dataStore = DataStore.shared
     
+    // Animation properties
+    private var previousSpendValue: Double = 0.0
+    private var animationTimer: Timer?
+    
     init() {
         Logger.app.info("🚀 Initializing ClaudeNein MenuBarManager")
         self.homeDirectoryAccessManager = HomeDirectoryAccessManager()
@@ -75,6 +79,7 @@ class MenuBarManager: ObservableObject {
     
     deinit {
         Logger.app.info("🛑 Deinitializing MenuBarManager")
+        animationTimer?.invalidate()
         statusItem = nil
         Logger.app.info("✅ MenuBarManager deinitialized")
     }
@@ -88,6 +93,8 @@ class MenuBarManager: ObservableObject {
             return
         }
         
+        // Initialize previous value to current spend to avoid initial animation
+        previousSpendValue = currentSummary.todaySpend
         updateStatusBarTitle()
         statusButton.action = #selector(menuBarButtonClicked)
         statusButton.target = self
@@ -331,9 +338,57 @@ class MenuBarManager: ObservableObject {
             Logger.menuBar.error("❌ Cannot update status bar title - no status button")
             return
         }
-        let title = formatCurrency(currentSummary.todaySpend)
-        statusButton.title = title
-        Logger.menuBar.debug("📱 Updated status bar title: \(title)")
+        
+        let newValue = currentSummary.todaySpend
+        
+        // If values are the same, no animation needed
+        if abs(previousSpendValue - newValue) < 0.001 {
+            let title = formatCurrency(newValue)
+            statusButton.title = title
+            Logger.menuBar.debug("📱 Updated status bar title (no change): \(title)")
+            return
+        }
+        
+        // Cancel any existing animation
+        animationTimer?.invalidate()
+        
+        // Log the transition before starting
+        Logger.menuBar.debug("📱 Started animated status bar title transition: \(self.formatCurrency(self.previousSpendValue)) → \(self.formatCurrency(newValue))")
+        
+        // Start animated transition
+        animateValueTransition(from: previousSpendValue, to: newValue) { [weak self] currentValue in
+            DispatchQueue.main.async {
+                guard let self = self, let statusButton = self.statusItem?.button else { return }
+                let title = self.formatCurrency(currentValue)
+                statusButton.title = title
+            }
+        }
+        
+        // Update previous value for next animation
+        previousSpendValue = newValue
+    }
+    
+    private func animateValueTransition(from startValue: Double, to endValue: Double, updateBlock: @escaping (Double) -> Void) {
+        let steps = 10
+        let stepDuration = 0.1 // 100ms
+        let stepIncrement = (endValue - startValue) / Double(steps)
+        
+        var currentStep = 0
+        
+        animationTimer = Timer.scheduledTimer(withTimeInterval: stepDuration, repeats: true) { [weak self] timer in
+            currentStep += 1
+            
+            if currentStep >= steps {
+                // Final step - ensure we end exactly at the target value
+                updateBlock(endValue)
+                timer.invalidate()
+                self?.animationTimer = nil
+            } else {
+                // Intermediate step
+                let currentValue = startValue + (stepIncrement * Double(currentStep))
+                updateBlock(currentValue)
+            }
+        }
     }
     
     private func formatCurrency(_ amount: Double, label: String? = nil) -> String {
