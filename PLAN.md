@@ -94,7 +94,9 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] This month's spend
   - [x] Separator and additional options
 - [x] Add interactive elements:
-  - [x] "Refresh" menu item for manual updates
+- [x] "Refresh" menu item for manual updates
+  - [x] "Refresh Pricing" menu item
+  - [x] Display pricing last fetched time in menu
   - [x] "Grant/Revoke Access" menu items for home directory permissions
   - [x] "Reload Database" menu item with confirmation dialog for clearing all cached data
   - [x] "Quit" menu item
@@ -208,7 +210,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 
 ## Optional Enhancements (Future)
 - [ ] Notifications for spending thresholds
-- [ ] Historical spending graphs and trends
+- [x] Historical spending graphs and trends
 - [ ] Export spending data to CSV/JSON
 - [ ] Integration with expense tracking apps
 - [ ] Customizable spending alerts and limits
