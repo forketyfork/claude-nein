@@ -20,7 +20,6 @@
 		1044BE4B2E2E6A9100CF5877 /* ClaudeNein.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeNein.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1044BE592E2E6A9200CF5877 /* ClaudeNeinTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudeNeinTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		10597F4D2E301B40009E7728 /* ClaudeNein.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = ClaudeNein.xctestplan; sourceTree = "<group>"; };
-		10CE64E02E301AFF000579D0 /* ClaudeNein.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = ClaudeNein.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -58,7 +57,6 @@
 			isa = PBXGroup;
 			children = (
 				10597F4D2E301B40009E7728 /* ClaudeNein.xctestplan */,
-				10CE64E02E301AFF000579D0 /* ClaudeNein.xctestplan */,
 				1044BE4D2E2E6A9100CF5877 /* ClaudeNein */,
 				1044BE5C2E2E6A9200CF5877 /* ClaudeNeinTests */,
 				1044BE4C2E2E6A9100CF5877 /* Products */,

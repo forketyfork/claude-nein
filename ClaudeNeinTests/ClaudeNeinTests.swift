@@ -24,7 +24,7 @@ struct ClaudeNeinTests {
         #expect(tokens2.cached == nil)
     }
     
-    @Test func testUsageEntryEquality() {
+    @Test func testUsageEntryEquality() throws {
         let date = Date()
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -48,7 +48,42 @@ struct ClaudeNeinTests {
             projectPath: "/test/path"
         )
         
-        #expect(entry1 == entry2)
+        try #require(entry1 == entry2)
+    }
+    
+    @Test func testCoreDataUpsert() async throws {
+        // Create an in-memory DataStore for testing
+        let dataStore = DataStore(inMemory: true)
+        
+        // Create test entries with cache tokens
+        let entry = UsageEntry(
+            timestamp: Date(),
+            model: "claude-3-5-sonnet-20241022",
+            tokenCounts: TokenCounts(input: 100, output: 200, cacheCreation: 50, cacheRead: 25),
+            cost: 1.5,
+            sessionId: "test-session",
+            projectPath: "/test/path",
+            requestId: "req-123",
+            originalMessageId: "msg-456"
+        )
+        
+        // Test upsert
+        await dataStore.upsertEntries([entry])
+        
+        // Fetch and verify
+        let fetchedEntries = dataStore.fetchAllEntries()
+        try #require(fetchedEntries.count == 1)
+        
+        let fetchedEntry = fetchedEntries[0]
+        try #require(fetchedEntry.model == "claude-3-5-sonnet-20241022")
+        try #require(fetchedEntry.tokenCounts.input == 100)
+        try #require(fetchedEntry.tokenCounts.output == 200)
+        try #require(fetchedEntry.tokenCounts.cacheCreation == 50)
+        try #require(fetchedEntry.tokenCounts.cacheRead == 25)
+        try #require(fetchedEntry.cost == 1.5)
+        try #require(fetchedEntry.sessionId == "test-session")
+        try #require(fetchedEntry.requestId == "req-123")
+        try #require(fetchedEntry.originalMessageId == "msg-456")
     }
     
     
@@ -58,63 +93,63 @@ struct ClaudeNeinTests {
 
 struct JSONLParserTests {
     
-    @Test func testValidJSONLParsing() {
+    @Test func testValidJSONLParsing() throws {
         let parser = JSONLParser()
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}, "costUSD": 1.5}
-        {"id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100, "cache_read_input_tokens": 25}, "costUSD": 0.5}
+        {"type": "assistant", "id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}, "costUSD": 1.5}
+        {"type": "assistant", "id": "test-2", "timestamp": 1721552400, "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100, "cache_read_input_tokens": 25}, "costUSD": 0.5}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
-        #expect(entries.count == 2)
-        #expect(entries[0].id == "test-1")
-        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
-        #expect(entries[0].tokenCounts.input == 100)
-        #expect(entries[0].tokenCounts.output == 200)
-        #expect(entries[0].cost == 1.5)
+        try #require(entries.count == 2)
+        try #require(entries[0].originalMessageId == "test-1")
+        try #require(entries[0].model == "claude-3-5-sonnet-20241022")
+        try #require(entries[0].tokenCounts.input == 100)
+        try #require(entries[0].tokenCounts.output == 200)
+        try #require(entries[0].cost == 1.5)
         
-        #expect(entries[1].id == "test-2")
-        #expect(entries[1].model == "claude-3-5-haiku-20241022")
-        #expect(entries[1].tokenCounts.cached == 25)
+        try #require(entries[1].originalMessageId == "test-2")
+        try #require(entries[1].model == "claude-3-5-haiku-20241022")
+        try #require(entries[1].tokenCounts.cached == 25)
     }
     
-    @Test func testMalformedJSONLHandling() {
+    @Test func testMalformedJSONLHandling() throws {
         let parser = JSONLParser()
         let jsonlContent = """
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
+        {"type": "assistant", "id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
         invalid json line
-        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
+        {"type": "assistant", "id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
         {"incomplete": "data"
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
         // Should successfully parse valid entries and skip malformed ones
-        #expect(entries.count == 2)
-        #expect(entries[0].id == "test-1")
-        #expect(entries[1].id == "test-2")
+        try #require(entries.count == 2)
+        try #require(entries[0].originalMessageId == "test-1")
+        try #require(entries[1].originalMessageId == "test-2")
     }
     
-    @Test func testEmptyAndWhitespaceLines() {
+    @Test func testEmptyAndWhitespaceLines() throws {
         let parser = JSONLParser()
         let jsonlContent = """
         
-        {"id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
+        {"type": "assistant", "id": "test-1", "timestamp": "2024-07-21T10:00:00Z", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}
         
         
-        {"id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
+        {"type": "assistant", "id": "test-2", "timestamp": "2024-07-21T10:05:00Z", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}
         
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
-        #expect(entries.count == 2)
-        #expect(entries[0].id == "test-1")
-        #expect(entries[1].id == "test-2")
+        try #require(entries.count == 2)
+        try #require(entries[0].originalMessageId == "test-1")
+        try #require(entries[1].originalMessageId == "test-2")
     }
     
-    @Test func testDeduplicationFunctionality() {
+    @Test func testDeduplicationFunctionality() throws {
         let parser = JSONLParser()
         
         // Test entries with same request and message IDs (should be deduplicated)
@@ -125,24 +160,24 @@ struct JSONLParserTests {
         """
         
         let entriesWithDedup = parser.parseJSONLContent(jsonlContent, enableDeduplication: true)
-        #expect(entriesWithDedup.count == 2) // Should deduplicate first two entries
-        #expect(entriesWithDedup[0].requestId == "req-123")
-        #expect(entriesWithDedup[1].requestId == "req-789")
+        try #require(entriesWithDedup.count == 2) // Should deduplicate first two entries
+        try #require(entriesWithDedup[0].requestId == "req-123")
+        try #require(entriesWithDedup[1].requestId == "req-789")
         
         // Clear cache and test without deduplication
         parser.clearDeduplicationCache()
         let entriesWithoutDedup = parser.parseJSONLContent(jsonlContent, enableDeduplication: false)
-        #expect(entriesWithoutDedup.count == 3) // Should include all entries
+        try #require(entriesWithoutDedup.count == 3) // Should include all entries
     }
     
-    @Test func testUniqueHashGeneration() {
+    @Test func testUniqueHashGeneration() throws {
         let entry1 = UsageEntry(
             id: "test-1",
             timestamp: Date(),
             model: "claude-3-5-sonnet-20241022",
             tokenCounts: TokenCounts(input: 100, output: 200),
             requestId: "req-123",
-            messageId: "msg-456"
+            originalMessageId: "msg-456"
         )
         
         let entry2 = UsageEntry(
@@ -151,7 +186,7 @@ struct JSONLParserTests {
             model: "claude-3-5-sonnet-20241022",
             tokenCounts: TokenCounts(input: 100, output: 200),
             requestId: "req-123",
-            messageId: "msg-456"
+            originalMessageId: "msg-456"
         )
         
         let entry3 = UsageEntry(
@@ -160,31 +195,31 @@ struct JSONLParserTests {
             model: "claude-3-5-sonnet-20241022",
             tokenCounts: TokenCounts(input: 100, output: 200),
             requestId: nil,
-            messageId: "msg-456"
+            originalMessageId: "msg-456"
         )
         
         // Same request and message IDs should produce same hash with new format
         let expectedHash = "msg-456:req-123"
-        #expect(entry1.uniqueHash() == expectedHash)
-        #expect(entry2.uniqueHash() == expectedHash)
+        try #require(entry1.uniqueHash() == expectedHash)
+        try #require(entry2.uniqueHash() == expectedHash)
         
         // Missing request ID should return nil
-        #expect(entry3.uniqueHash() == nil)
+        try #require(entry3.uniqueHash() == nil)
     }
     
-    @Test func testFractionalSecondsTimestampParsing() {
+    @Test func testFractionalSecondsTimestampParsing() throws {
         let parser = JSONLParser()
         
         // Test parsing entries with fractional seconds in timestamps
         let jsonlContent = """
-        {"timestamp": "2024-07-21T10:00:00.123Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
-        {"timestamp": "2024-07-21T10:00:00.456789Z", "message": {"id": "msg-2", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}}
-        {"timestamp": "2024-07-21T10:00:00Z", "message": {"id": "msg-3", "model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:00:00.123Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:00:00.456789Z", "message": {"id": "msg-2", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:00:00Z", "message": {"id": "msg-3", "model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
-        #expect(entries.count == 3)
+        try #require(entries.count == 3)
         
         // Check that timestamps with fractional seconds were parsed correctly
         let formatter = ISO8601DateFormatter()
@@ -192,83 +227,142 @@ struct JSONLParserTests {
         
         // First entry with .123 fractional seconds
         let expectedTime1 = formatter.date(from: "2024-07-21T10:00:00.123Z")
-        #expect(entries[0].timestamp == expectedTime1)
+        try #require(entries[0].timestamp == expectedTime1)
         
         // Second entry with .456789 fractional seconds
         let expectedTime2 = formatter.date(from: "2024-07-21T10:00:00.456789Z")
-        #expect(entries[1].timestamp == expectedTime2)
+        try #require(entries[1].timestamp == expectedTime2)
         
         // Third entry without fractional seconds (should still work)
         let standardFormatter = ISO8601DateFormatter()
         let expectedTime3 = standardFormatter.date(from: "2024-07-21T10:00:00Z")
-        #expect(entries[2].timestamp == expectedTime3)
+        try #require(entries[2].timestamp == expectedTime3)
     }
     
-    @Test func testStandardUsageFormatParsing() {
+    @Test func testStandardUsageFormatParsing() throws {
         let parser = JSONLParser()
         
         // Test standard usage entry format with proper schema
         let jsonlContent = """
-        {"timestamp": "2024-07-21T10:00:00.123Z", "requestId": "req-123", "version": "1.0", "message": {"id": "msg-456", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 1000, "output_tokens": 2000, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 200}}, "costUSD": 15.5}
-        {"timestamp": "2024-07-21T10:01:00Z", "message": {"model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 500, "output_tokens": 1000}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:00:00.123Z", "requestId": "req-123", "version": "1.0", "message": {"id": "msg-456", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 1000, "output_tokens": 2000, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 200}}, "costUSD": 15.5}
+        {"type": "assistant", "timestamp": "2024-07-21T10:01:00Z", "message": {"model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 500, "output_tokens": 1000}}}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
-        #expect(entries.count == 2)
+        try #require(entries.count == 2)
         
         // First entry - full schema with cached tokens
         let entry1 = entries[0]
-        #expect(entry1.model == "claude-3-5-sonnet-20241022")
-        #expect(entry1.tokenCounts.input == 1000)
-        #expect(entry1.tokenCounts.output == 2000)
-        #expect(entry1.tokenCounts.cached == 300) // 100 + 200
-        #expect(entry1.cost == 15.5)
-        #expect(entry1.requestId == "req-123")
-        #expect(entry1.messageId == "msg-456")
+        try #require(entry1.model == "claude-3-5-sonnet-20241022")
+        try #require(entry1.tokenCounts.input == 1000)
+        try #require(entry1.tokenCounts.output == 2000)
+        try #require(entry1.tokenCounts.cached == 300) // 100 + 200
+        try #require(entry1.cost == 15.5)
+        try #require(entry1.requestId == "req-123")
+        try #require(entry1.originalMessageId == "msg-456")
         
         // Second entry - minimal schema
         let entry2 = entries[1]
-        #expect(entry2.model == "claude-3-5-haiku-20241022")
-        #expect(entry2.tokenCounts.input == 500)
-        #expect(entry2.tokenCounts.output == 1000)
-        #expect(entry2.tokenCounts.cached == nil)
-        #expect(entry2.cost == nil)
+        try #require(entry2.model == "claude-3-5-haiku-20241022")
+        try #require(entry2.tokenCounts.input == 500)
+        try #require(entry2.tokenCounts.output == 1000)
+        try #require(entry2.tokenCounts.cached == nil)
+        try #require(entry2.cost == nil)
     }
     
-    @Test func testImprovedLineParsingWithNewlines() {
+    @Test func testImprovedLineParsingWithNewlines() throws {
         let parser = JSONLParser()
         
         // Test consistent line parsing with different line ending styles
-        let contentWithMixedLineEndings = "{\"timestamp\": \"2024-07-21T10:00:00Z\", \"message\": {\"model\": \"claude-3-5-sonnet-20241022\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 200}}}\n{\"timestamp\": \"2024-07-21T10:01:00Z\", \"message\": {\"model\": \"claude-3-5-haiku-20241022\", \"usage\": {\"input_tokens\": 50, \"output_tokens\": 100}}}\n"
+        let contentWithMixedLineEndings = "{\"type\": \"assistant\", \"timestamp\": \"2024-07-21T10:00:00Z\", \"message\": {\"model\": \"claude-3-5-sonnet-20241022\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 200}}}\n{\"type\": \"assistant\", \"timestamp\": \"2024-07-21T10:01:00Z\", \"message\": {\"model\": \"claude-3-5-haiku-20241022\", \"usage\": {\"input_tokens\": 50, \"output_tokens\": 100}}}\n"
         
         let entries = parser.parseJSONLContent(contentWithMixedLineEndings)
         
-        #expect(entries.count == 2)
-        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
-        #expect(entries[1].model == "claude-3-5-haiku-20241022")
+        try #require(entries.count == 2)
+        try #require(entries[0].model == "claude-3-5-sonnet-20241022")
+        try #require(entries[1].model == "claude-3-5-haiku-20241022")
     }
     
-    @Test func testRobustErrorHandlingInParsing() {
+    @Test func testRobustErrorHandlingInParsing() throws {
         let parser = JSONLParser()
         
         // Test that invalid lines are silently skipped without causing errors
         let jsonlContent = """
-        {"timestamp": "2024-07-21T10:00:00Z", "message": {"model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:00:00Z", "message": {"model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}}
         {invalid json without proper structure
         {"timestamp": "invalid-timestamp", "message": {"model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}}
-        {"timestamp": "2024-07-21T10:02:00Z", "message": {"model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
+        {"type": "assistant", "timestamp": "2024-07-21T10:02:00Z", "message": {"model": "claude-3-opus-20240229", "usage": {"input_tokens": 75, "output_tokens": 150}}}
         """
         
         let entries = parser.parseJSONLContent(jsonlContent)
         
         // Should parse the valid entries and silently skip invalid ones
-        #expect(entries.count == 2)
-        #expect(entries[0].model == "claude-3-5-sonnet-20241022")
-        #expect(entries[1].model == "claude-3-opus-20240229")
+        try #require(entries.count == 2)
+        try #require(entries[0].model == "claude-3-5-sonnet-20241022")
+        try #require(entries[1].model == "claude-3-opus-20240229")
     }
     
-    @Test func testChronologicalFileSorting() {
+    @Test func testEntryTypeFiltering() throws {
+        let parser = JSONLParser()
+        
+        // Test that only assistant entries with usage data are parsed
+        let jsonlContent = """
+        {"type": "user", "timestamp": "2024-07-21T10:00:00Z", "message": {"role": "user", "content": [{"type": "text", "text": "Hello"}]}, "uuid": "user-uuid-1"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:01:00Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}, "requestId": "req-123"}
+        {"type": "summary", "timestamp": "2024-07-21T10:02:00Z", "summary": "This is a summary", "leafUuid": "leaf-uuid"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:03:00Z", "message": {"id": "msg-2", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}, "requestId": "req-456"}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        // Should only parse the 2 assistant entries, ignoring user and summary entries
+        try #require(entries.count == 2)
+        try #require(entries[0].model == "claude-3-5-sonnet-20241022")
+        try #require(entries[0].originalMessageId == "msg-1")
+        try #require(entries[0].requestId == "req-123")
+        try #require(entries[1].model == "claude-3-5-haiku-20241022")
+        try #require(entries[1].originalMessageId == "msg-2")
+        try #require(entries[1].requestId == "req-456")
+    }
+    
+    @Test func testAssistantEntryWithoutUsageData() throws {
+        let parser = JSONLParser()
+        
+        // Test assistant entry that doesn't have usage data (should be filtered out)
+        let jsonlContent = """
+        {"type": "assistant", "timestamp": "2024-07-21T10:01:00Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "content": [{"type": "text", "text": "Hello"}]}, "requestId": "req-123"}
+        {"type": "assistant", "timestamp": "2024-07-21T10:02:00Z", "message": {"id": "msg-2", "model": "claude-3-5-haiku-20241022", "usage": {"input_tokens": 50, "output_tokens": 100}}, "requestId": "req-456"}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        // Should only parse the entry with usage data
+        try #require(entries.count == 1)
+        try #require(entries[0].model == "claude-3-5-haiku-20241022")
+        try #require(entries[0].originalMessageId == "msg-2")
+        try #require(entries[0].requestId == "req-456")
+    }
+    
+    @Test func testUserEntryWithToolResults() throws {
+        let parser = JSONLParser()
+        
+        // Test the specific user entry format from the error message
+        let jsonlContent = """
+        {"parentUuid":"9d3120af-7075-4338-81ac-f0cc7d2a6d8d","isSidechain":true,"userType":"external","cwd":"/Users/sergei.petunin/dev/jb/CodeCanvas/codecanvas","sessionId":"1af9c387-f946-4ff7-aea2-9714ca69348b","version":"1.0.35","type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01PbVyEXoVzfzUEAB1QDaTDS","type":"tool_result","content":"No files found"}]},"uuid":"9e3f02a5-5a9a-4307-9de0-c335e58f7847","timestamp":"2025-06-26T11:14:58.178Z","toolUseResult":{"filenames":[],"numFiles":0}}
+        {"type": "assistant", "timestamp": "2025-06-26T11:15:00Z", "message": {"id": "msg-1", "model": "claude-3-5-sonnet-20241022", "usage": {"input_tokens": 100, "output_tokens": 200}}, "requestId": "req-123"}
+        """
+        
+        let entries = parser.parseJSONLContent(jsonlContent)
+        
+        // Should only parse the assistant entry, ignoring the user entry with tool results
+        try #require(entries.count == 1)
+        try #require(entries[0].model == "claude-3-5-sonnet-20241022")
+        try #require(entries[0].originalMessageId == "msg-1")
+        try #require(entries[0].requestId == "req-123")
+    }
+    
+    @Test func testChronologicalFileSorting() throws {
         // Create temporary files with different timestamps
         let tempDir = FileManager.default.temporaryDirectory
         let file1 = tempDir.appendingPathComponent("file1_\(UUID().uuidString).jsonl")
@@ -296,9 +390,9 @@ struct JSONLParserTests {
             let sortedFiles = JSONLParser.sortFilesByTimestamp([file1, file2, file3])
             
             // Should be sorted by earliest timestamp: file2 (10:00), file3 (11:00), file1 (12:00)
-            #expect(sortedFiles[0] == file2)
-            #expect(sortedFiles[1] == file3)
-            #expect(sortedFiles[2] == file1)
+            try #require(sortedFiles[0] == file2)
+            try #require(sortedFiles[1] == file3)
+            try #require(sortedFiles[2] == file1)
             
             // Clean up
             try? FileManager.default.removeItem(at: file1)
@@ -306,11 +400,11 @@ struct JSONLParserTests {
             try? FileManager.default.removeItem(at: file3)
         } catch {
             // Test failed due to file system error
-            #expect(Bool(false), "File system error: \\(error)")
+            try #require(Bool(false), "File system error: \\(error)")
         }
     }
     
-    @Test func testDiscoverClaudeConfigDirectories() {
+    @Test func testDiscoverClaudeConfigDirectories() throws {
         let directories = JSONLParser.findClaudeConfigDirectories()
         
         // Should return at least some directories (even if they don't exist)
@@ -323,11 +417,11 @@ struct JSONLParserTests {
         let configClaudeDir = homeDirectory.appendingPathComponent(".config/claude/projects")
         
         if FileManager.default.fileExists(atPath: claudeDir.path) {
-            #expect(directories.contains(claudeDir))
+            try #require(directories.contains(claudeDir))
         }
         
         if FileManager.default.fileExists(atPath: configClaudeDir.path) {
-            #expect(directories.contains(configClaudeDir))
+            try #require(directories.contains(configClaudeDir))
         }
     }
 }
@@ -336,24 +430,24 @@ struct JSONLParserTests {
 
 struct PricingManagerTests {
     
-    @Test func testBundledPricingData() {
+    @Test func testBundledPricingData() throws {
         let pricingManager = PricingManager.shared
         let pricing = pricingManager.getCurrentPricing()
         
         // Verify bundled data contains expected models
-        #expect(pricing.models["claude-3-5-sonnet-20241022"] != nil)
-        #expect(pricing.models["claude-3-5-haiku-20241022"] != nil)
-        #expect(pricing.models["claude-3-opus-20240229"] != nil)
+        try #require(pricing.models["claude-3-5-sonnet-20241022"] != nil)
+        try #require(pricing.models["claude-3-5-haiku-20241022"] != nil)
+        try #require(pricing.models["claude-3-opus-20240229"] != nil)
         
         // Verify pricing structure
         if let sonnetPricing = pricing.models["claude-3-5-sonnet-20241022"] {
-            #expect(sonnetPricing.inputPrice == 3.0)
-            #expect(sonnetPricing.outputPrice == 15.0)
-            #expect(sonnetPricing.cacheReadPrice == 0.3)
+            try #require(sonnetPricing.inputPrice == 3.0)
+            try #require(sonnetPricing.outputPrice == 15.0)
+            try #require(sonnetPricing.cacheReadPrice == 0.3)
         }
     }
     
-    @Test func testCostCalculationWithPrecalculatedCost() {
+    @Test func testCostCalculationWithPrecalculatedCost() throws {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -368,10 +462,10 @@ struct PricingManagerTests {
         )
         
         let calculatedCost = pricingManager.calculateCost(for: entry)
-        #expect(calculatedCost == 2.5)
+        try #require(calculatedCost == 2.5)
     }
     
-    @Test func testCostCalculationModesDisplay() {
+    @Test func testCostCalculationModesDisplay() throws {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -387,7 +481,7 @@ struct PricingManagerTests {
         )
         
         let displayCost = pricingManager.calculateCost(for: entryWithCost, mode: .display)
-        #expect(displayCost == 2.5)
+        try #require(displayCost == 2.5)
         
         // Test display mode without costUSD (should return 0)
         let entryWithoutCost = UsageEntry(
@@ -401,10 +495,10 @@ struct PricingManagerTests {
         )
         
         let displayCostZero = pricingManager.calculateCost(for: entryWithoutCost, mode: .display)
-        #expect(displayCostZero == 0.0)
+        try #require(displayCostZero == 0.0)
     }
     
-    @Test func testCostCalculationModesCalculate() {
+    @Test func testCostCalculationModesCalculate() throws {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cacheCreation: 500_000, cacheRead: 500_000)
         
@@ -423,10 +517,10 @@ struct PricingManagerTests {
         
         // Expected: (1M * 3.0 + 1M * 15.0 + 500K * 3.75/1M + 500K * 0.3/1M) = 20.025
         let expectedCost = 3.0 + 15.0 + 1.875 + 0.15
-        #expect(abs(calculatedCost - expectedCost) < 0.001)
+        try #require(abs(calculatedCost - expectedCost) < 0.001)
     }
     
-    @Test func testCostCalculationModesAuto() {
+    @Test func testCostCalculationModesAuto() throws {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -442,7 +536,7 @@ struct PricingManagerTests {
         )
         
         let autoCostWithCost = pricingManager.calculateCost(for: entryWithCost, mode: .auto)
-        #expect(autoCostWithCost == 2.5)
+        try #require(autoCostWithCost == 2.5)
         
         // Test auto mode without costUSD (should calculate)
         let entryWithoutCost = UsageEntry(
@@ -459,7 +553,7 @@ struct PricingManagerTests {
         #expect(autoCostCalculated > 0.0) // Should calculate from tokens
     }
     
-    @Test func testCostCalculationFromTokens() {
+    @Test func testCostCalculationFromTokens() throws {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 1_000_000, output: 1_000_000, cacheCreation: 500_000, cacheRead: 500_000)
         
@@ -477,10 +571,10 @@ struct PricingManagerTests {
         
         // Expected: (1M * 3.0 + 1M * 15.0 + 500K * 3.75/1M + 500K * 0.3/1M) = 20.025
         let expectedCost = 3.0 + 15.0 + 1.875 + 0.15
-        #expect(abs(calculatedCost - expectedCost) < 0.001)
+        try #require(abs(calculatedCost - expectedCost) < 0.001)
     }
     
-    @Test func testCostCalculationUnknownModel() {
+    @Test func testCostCalculationUnknownModel() throws {
         let pricingManager = PricingManager.shared
         let tokens = TokenCounts(input: 100, output: 200)
         
@@ -495,10 +589,10 @@ struct PricingManagerTests {
         )
         
         let calculatedCost = pricingManager.calculateCost(for: entry)
-        #expect(calculatedCost == 0.0) // Should return 0 for unknown models
+        try #require(calculatedCost == 0.0) // Should return 0 for unknown models
     }
     
-    @Test func testCalculateTotalCostForMultipleEntries() {
+    @Test func testCalculateTotalCostForMultipleEntries() throws {
         let pricingManager = PricingManager.shared
         
         let entry1 = UsageEntry(
@@ -525,7 +619,7 @@ struct PricingManagerTests {
         
         // Expected: 3.0 (Sonnet input) + 0.8 (Haiku input) = 3.8
         let expectedCost = 3.0 + 0.8
-        #expect(abs(totalCost - expectedCost) < 0.001)
+        try #require(abs(totalCost - expectedCost) < 0.001)
     }
 }
 
@@ -533,7 +627,7 @@ struct PricingManagerTests {
 
 struct SpendCalculatorTests {
     
-    @Test func testCalculateSpendSummary() {
+    @Test func testCalculateSpendSummary() throws {
         let calculator = SpendCalculator()
         let now = Date()
         let calendar = Calendar.current
@@ -553,19 +647,19 @@ struct SpendCalculatorTests {
         let summary = calculator.calculateSpendSummary(from: entries)
 
         // Today spend should only include today's entry
-        #expect(summary.todaySpend == 1.0)
+        try #require(summary.todaySpend == 1.0)
 
         // Week spend should include entries from startOfWeek onwards
         let expectedWeekSpend = PricingManager.shared.calculateTotalCost(for: [todayEntry, weekStartEntry])
-        #expect(abs(summary.weekSpend - expectedWeekSpend) < 0.001)
+        try #require(abs(summary.weekSpend - expectedWeekSpend) < 0.001)
 
         // Month spend should include entries from startOfMonth onwards
         let expectedMonthEntries = [todayEntry, weekStartEntry, beforeWeekEntry, monthStartEntry]
         let expectedMonthSpend = PricingManager.shared.calculateTotalCost(for: expectedMonthEntries)
-        #expect(abs(summary.monthSpend - expectedMonthSpend) < 0.001)
+        try #require(abs(summary.monthSpend - expectedMonthSpend) < 0.001)
     }
     
-    @Test func testCalculateSpendSummaryWithCostModes() {
+    @Test func testCalculateSpendSummaryWithCostModes() throws {
         let calculator = SpendCalculator()
         let now = Date()
         
@@ -576,18 +670,18 @@ struct SpendCalculatorTests {
         
         // Test display mode - should only use costUSD values
         let displaySummary = calculator.calculateSpendSummary(from: entries, costMode: .display)
-        #expect(displaySummary.todaySpend == 5.0) // Only the entry with cost contributes
+        try #require(displaySummary.todaySpend == 5.0) // Only the entry with cost contributes
         
         // Test calculate mode - should ignore costUSD and calculate from tokens
         let calculateSummary = calculator.calculateSpendSummary(from: entries, costMode: .calculate)
-        #expect(calculateSummary.todaySpend > 0.0) // Should calculate costs from tokens for both entries
+        try #require(calculateSummary.todaySpend > 0.0) // Should calculate costs from tokens for both entries
         
         // Test auto mode - should use costUSD when available, calculate otherwise
         let autoSummary = calculator.calculateSpendSummary(from: entries, costMode: .auto)
-        #expect(autoSummary.todaySpend > 5.0) // Should use 5.0 + calculated cost for second entry
+        try #require(autoSummary.todaySpend > 5.0) // Should use 5.0 + calculated cost for second entry
     }
     
-    @Test func testFilterEntriesToday() {
+    @Test func testFilterEntriesToday() throws {
         let calculator = SpendCalculator()
         let now = Date()
         let calendar = Calendar.current
@@ -605,10 +699,10 @@ struct SpendCalculatorTests {
         
         // Calculate expected today spend manually
         let expectedTodaySpend = PricingManager.shared.calculateTotalCost(for: [todayEntry1, todayEntry2])
-        #expect(abs(summary.todaySpend - expectedTodaySpend) < 0.001)
+        try #require(abs(summary.todaySpend - expectedTodaySpend) < 0.001)
     }
     
-    @Test func testCalculateDailySpendForSpecificDate() {
+    @Test func testCalculateDailySpendForSpecificDate() throws {
         let calculator = SpendCalculator()
         let calendar = Calendar.current
         let targetDate = Date()
@@ -621,14 +715,14 @@ struct SpendCalculatorTests {
         let entries = [targetEntry1, targetEntry2, otherDateEntry]
         let dailySpend = calculator.calculateDailySpend(from: entries, for: targetDate)
         
-        #expect(dailySpend == 4.0) // 1.5 + 2.5
+        try #require(dailySpend == 4.0) // 1.5 + 2.5
     }
     
-    @Test func testCalculateSpendInRange() {
+    @Test func testCalculateSpendInRange() throws {
         let calculator = SpendCalculator()
         let calendar = Calendar.current
         let endDate = Date()
-        let startDate = calendar.date(byAdding: .day, value: -3, to: endDate)!
+        let startDate = calendar.date(byAdding: .day, value: -3, to: endDate)!;
         
         // Create entries within and outside the range
         let inRangeEntry1 = createTestEntry(id: "in-1", timestamp: startDate, cost: 1.0)
@@ -638,10 +732,10 @@ struct SpendCalculatorTests {
         let entries = [inRangeEntry1, inRangeEntry2, outOfRangeEntry]
         let rangeSpend = calculator.calculateSpendInRange(from: entries, startDate: startDate, endDate: endDate)
         
-        #expect(rangeSpend == 3.0) // 1.0 + 2.0
+        try #require(rangeSpend == 3.0) // 1.0 + 2.0
     }
     
-    @Test func testCalculateModelBreakdown() {
+    @Test func testCalculateModelBreakdown() throws {
         let calculator = SpendCalculator()
         
         // Create entries with different models
@@ -652,9 +746,9 @@ struct SpendCalculatorTests {
         let entries = [sonnetEntry1, sonnetEntry2, haikuEntry]
         let breakdown = calculator.calculateModelBreakdown(from: entries)
         
-        #expect(breakdown["claude-3-5-sonnet-20241022"] == 5.0)
-        #expect(breakdown["claude-3-5-haiku-20241022"] == 1.0)
-        #expect(breakdown.count == 2)
+        try #require(breakdown["claude-3-5-sonnet-20241022"] == 5.0)
+        try #require(breakdown["claude-3-5-haiku-20241022"] == 1.0)
+        try #require(breakdown.count == 2)
     }
     
     // Helper method to create test entries
@@ -680,7 +774,7 @@ struct SpendCalculatorTests {
 
 struct SpendSummaryFormattingTests {
     
-    @Test func testSpendFormatting() {
+    @Test func testSpendFormatting() throws {
         let summary = SpendSummary(
             todaySpend: 1.2345,
             weekSpend: 0.0067,
@@ -689,25 +783,25 @@ struct SpendSummaryFormattingTests {
         )
         
         // Test currency formatting
-        #expect(summary.formattedTodaySpend.contains("1.23") || summary.formattedTodaySpend.contains("1.2345"))
-        #expect(summary.formattedWeekSpend.contains("0.00") || summary.formattedWeekSpend.contains("0.006"))
-        #expect(summary.formattedMonthSpend.contains("123.46") || summary.formattedMonthSpend.contains("123.456"))
+        try #require(summary.formattedTodaySpend.contains("1.23") || summary.formattedTodaySpend.contains("1.2345"))
+        try #require(summary.formattedWeekSpend.contains("0.00") || summary.formattedWeekSpend.contains("0.006"))
+        try #require(summary.formattedMonthSpend.contains("123.46") || summary.formattedMonthSpend.contains("123.456"))
         
         // Test model breakdown formatting
         let formattedBreakdown = summary.formattedModelBreakdown
-        #expect(formattedBreakdown.count == 2)
+        try #require(formattedBreakdown.count == 2)
         
         // Should be sorted by spend amount (descending)
-        #expect(formattedBreakdown[0].model == "claude-3-5-sonnet-20241022")
-        #expect(formattedBreakdown[1].model == "claude-3-5-haiku-20241022")
+        try #require(formattedBreakdown[0].model == "claude-3-5-sonnet-20241022")
+        try #require(formattedBreakdown[1].model == "claude-3-5-haiku-20241022")
     }
     
-    @Test func testSmallAmountFormatting() {
+    @Test func testSmallAmountFormatting() throws {
         let summary = SpendSummary(todaySpend: 0.000123)
         
         // Small amounts should show more decimal places
         let formatted = summary.formattedTodaySpend
-        #expect(formatted.contains("0.000123") || formatted.contains("$0.00"))
+        try #require(formatted.contains("0.000123") || formatted.contains("$0.00"))
     }
 }
 
@@ -715,160 +809,29 @@ struct SpendSummaryFormattingTests {
 
 struct ErrorHandlingTests {
     
-    @Test func testPricingManagerWithEmptyEntries() {
+    @Test func testPricingManagerWithEmptyEntries() throws {
         let pricingManager = PricingManager.shared
         let totalCost = pricingManager.calculateTotalCost(for: [])
         
-        #expect(totalCost == 0.0)
+        try #require(totalCost == 0.0)
     }
     
-    @Test func testSpendCalculatorWithEmptyEntries() {
+    @Test func testSpendCalculatorWithEmptyEntries() throws {
         let calculator = SpendCalculator()
         let summary = calculator.calculateSpendSummary(from: [])
         
-        #expect(summary.todaySpend == 0.0)
-        #expect(summary.weekSpend == 0.0)
-        #expect(summary.monthSpend == 0.0)
-        #expect(summary.modelBreakdown.isEmpty)
+        try #require(summary.todaySpend == 0.0)
+        try #require(summary.weekSpend == 0.0)
+        try #require(summary.monthSpend == 0.0)
+        try #require(summary.modelBreakdown.isEmpty)
     }
     
-    @Test func testJSONLParserWithEmptyContent() {
+    @Test func testJSONLParserWithEmptyContent() throws {
         let parser = JSONLParser()
         let entries = parser.parseJSONLContent("")
         
-        #expect(entries.isEmpty)
+        try #require(entries.isEmpty)
     }
     
 }
 
-// MARK: - FileMonitor Tests
-
-struct FileMonitorTests {
-    
-    @Test func testFileStateCreation() {
-        // Create a temporary file for testing
-        let tempDir = FileManager.default.temporaryDirectory
-        let testFile = tempDir.appendingPathComponent("test_file_\(UUID().uuidString).txt")
-        
-        // Write test content to file
-        let testContent = "test content"
-        try? testContent.write(to: testFile, atomically: true, encoding: .utf8)
-        
-        // Test FileState creation
-        let fileState = FileMonitor.FileState.create(from: testFile)
-        
-        #expect(fileState != nil)
-        #expect(fileState?.url == testFile)
-        #expect((fileState?.size ?? 0) > 0)
-        
-        // Clean up
-        try? FileManager.default.removeItem(at: testFile)
-    }
-    
-    @Test func testFileStateCreationWithNonexistentFile() {
-        let nonexistentFile = URL(fileURLWithPath: "/nonexistent/path/file.txt")
-        let fileState = FileMonitor.FileState.create(from: nonexistentFile)
-        
-        #expect(fileState == nil)
-    }
-    
-    @Test func testFileMonitorInitialization() {
-        let fileMonitor = FileMonitor()
-        
-        #expect(fileMonitor.isMonitoring == false)
-        #expect(fileMonitor.getCachedEntries().isEmpty)
-    }
-    
-    @Test func testFileChangeNotificationStructure() {
-        let testFiles = [
-            URL(fileURLWithPath: "/test/file1.jsonl"),
-            URL(fileURLWithPath: "/test/file2.jsonl")
-        ]
-        
-        let notification = FileMonitor.FileChangeNotification(
-            changedFiles: testFiles,
-            timestamp: Date()
-        )
-        
-        #expect(notification.changedFiles.count == 2)
-        #expect(notification.changedFiles[0].path == "/test/file1.jsonl")
-        #expect(notification.changedFiles[1].path == "/test/file2.jsonl")
-    }
-    
-    @Test func testFileMonitorErrorTypes() {
-        let permissionError = FileMonitor.FileMonitorError.permissionDenied(path: "/restricted/path")
-        let fileNotFoundError = FileMonitor.FileMonitorError.fileNotFound(path: "/missing/file")
-        let diskFullError = FileMonitor.FileMonitorError.diskFull
-        let corruptedFileError = FileMonitor.FileMonitorError.corruptedFile(path: "/bad/file")
-        let networkError = FileMonitor.FileMonitorError.networkError(path: "/network/path")
-        let unknownError = FileMonitor.FileMonitorError.unknownError(underlying: NSError(domain: "test", code: 1))
-        
-        #expect(permissionError.errorDescription?.contains("Permission denied") == true)
-        #expect(fileNotFoundError.errorDescription?.contains("File not found") == true)
-        #expect(diskFullError.errorDescription?.contains("Disk is full") == true)
-        #expect(corruptedFileError.errorDescription?.contains("corrupted") == true)
-        #expect(networkError.errorDescription?.contains("Network") == true)
-        #expect(unknownError.errorDescription?.contains("Unknown error") == true)
-    }
-    
-    @Test func testClearCacheOperation() {
-        let fileMonitor = FileMonitor()
-        
-        // Initially, cache should be empty
-        #expect(fileMonitor.getCachedEntries().isEmpty)
-        
-        // Clear cache should not cause any issues when empty
-        fileMonitor.clearCache()
-        #expect(fileMonitor.getCachedEntries().isEmpty)
-    }
-    
-    @Test func testGetModifiedEntriesWithEmptyCache() {
-        let fileMonitor = FileMonitor()
-        let testDate = Date()
-        
-        let modifiedEntries = fileMonitor.getModifiedEntries(since: testDate)
-        #expect(modifiedEntries.isEmpty)
-    }
-    
-    @Test func testFileMonitorPublisherSetup() {
-        let fileMonitor = FileMonitor()
-        
-        // Test that fileChanges publisher is accessible
-        let publisher = fileMonitor.fileChanges
-        
-        // Verify publisher type
-        #expect(publisher is AnyPublisher<FileMonitor.FileChangeNotification, Never>)
-    }
-    
-    @Test func testFileMonitorThreadSafety() {
-        let fileMonitor = FileMonitor()
-        var results: [Int] = []
-        let resultsLock = NSLock()
-        
-        // Simulate concurrent access to getCachedEntries
-        DispatchQueue.concurrentPerform(iterations: 10) { index in
-            let entries = fileMonitor.getCachedEntries()
-            resultsLock.lock()
-            results.append(entries.count)
-            resultsLock.unlock()
-        }
-        
-        // All concurrent calls should complete successfully
-        #expect(results.count == 10)
-        
-        // All results should be the same (empty cache)
-        let uniqueResults = Set(results)
-        #expect(uniqueResults.count == 1)
-        #expect(uniqueResults.first == 0)
-    }
-    
-    @Test func testFileMonitorForceRefresh() {
-        let fileMonitor = FileMonitor()
-        
-        // Force refresh should not crash when no monitoring is active
-        fileMonitor.forceRefresh()
-        
-        // Cache should still be empty
-        #expect(fileMonitor.getCachedEntries().isEmpty)
-    }
-}

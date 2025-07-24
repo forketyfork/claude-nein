@@ -26,6 +26,9 @@ extension Logger {
     /// JSONL parsing operations
     static let parser = Logger(subsystem: subsystem, category: "parser")
     
+    /// Core Data and database operations
+    static let dataStore = Logger(subsystem: subsystem, category: "datastore")
+    
     /// Spending calculations and data processing
     static let calculator = Logger(subsystem: subsystem, category: "calculator")
     

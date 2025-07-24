@@ -1,0 +1,2 @@
+{"type":"assistant","uuid":"test-uuid-1","timestamp":"2025-07-23T14:00:00.000Z","sessionId":"test-session","message":{"model":"claude-3-5-sonnet-20241022","usage":{"input_tokens":100,"output_tokens":50}}}
+{"type":"assistant","uuid":"test-uuid-2","timestamp":"2025-07-23T14:01:00.000Z","sessionId":"test-session","message":{"model":"claude-3-5-sonnet-20241022","usage":{"input_tokens":200,"output_tokens":75}}}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22618" systemVersion="23F79" minimumToolsVersion="11.0">
+    <entity name="UsageEntryEntity" representedClassName="UsageEntryEntity">
+        <attribute name="uniqueHash" attributeType="String" isOptional="YES"/>
+        <attribute name="timestamp" attributeType="Date" isOptional="NO"/>
+        <attribute name="model" attributeType="String" isOptional="NO"/>
+        <attribute name="inputTokens" attributeType="Integer 64" isOptional="NO"/>
+        <attribute name="outputTokens" attributeType="Integer 64" isOptional="NO"/>
+        <attribute name="cacheCreationTokens" attributeType="Integer 64" isOptional="YES"/>
+        <attribute name="cacheReadTokens" attributeType="Integer 64" isOptional="YES"/>
+        <attribute name="cost" attributeType="Double" isOptional="NO"/>
+        <attribute name="sessionId" attributeType="String" isOptional="YES"/>
+        <attribute name="projectPath" attributeType="String" isOptional="YES"/>
+        <attribute name="requestId" attributeType="String" isOptional="YES"/>
+        <attribute name="messageId" attributeType="String" isOptional="YES"/>
+    </entity>
+</model>

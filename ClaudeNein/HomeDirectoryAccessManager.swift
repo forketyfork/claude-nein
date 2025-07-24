@@ -3,7 +3,7 @@ import AppKit
 import OSLog
 
 /// Manages access to the user's home directory in a sandboxed environment
-class HomeDirectoryAccessManager: ObservableObject {
+class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
     
     // MARK: - Properties
     
@@ -29,6 +29,10 @@ class HomeDirectoryAccessManager: ObservableObject {
     /// - Returns: True if access was granted, false otherwise
     @discardableResult
     func requestHomeDirectoryAccess() async -> Bool {
+        if hasValidAccess {
+            return true
+        }
+
         await MainActor.run {
             isRequestingAccess = true
         }
@@ -58,6 +62,22 @@ class HomeDirectoryAccessManager: ObservableObject {
     func getSecuredHomeDirectoryURL() -> URL? {
         guard hasValidAccess else { return nil }
         return securedURL
+    }
+    
+    /// Get the URL for the .claude directory within the home directory
+    var claudeDirectoryURL: URL? {
+        guard hasValidAccess, let homeURL = getSecuredHomeDirectoryURL() else {
+            return nil
+        }
+        return homeURL.appendingPathComponent(".claude", isDirectory: true)
+    }
+    
+    /// Get the URL for the projects directory within the .claude directory
+    var claudeProjectsDirectoryURL: URL? {
+        guard let claudeDir = claudeDirectoryURL else {
+            return nil
+        }
+        return claudeDir.appendingPathComponent("projects", isDirectory: true)
     }
     
     /// Revoke access to the home directory

@@ -26,6 +26,30 @@ class JSONLParser {
         }
     }
     
+    /// Asynchronously parse a single JSONL file.
+    func parse(fileURL: URL) async throws -> [UsageEntry] {
+        let content = try String(contentsOf: fileURL)
+        let lines = content.components(separatedBy: .newlines).filter { !$0.isEmpty }
+        
+        return lines.compactMap { line -> UsageEntry? in
+            guard let data = line.data(using: .utf8) else { return nil }
+            
+            do {
+                // Attempt to decode as a UsageEntry
+                return try decoder.decode(UsageEntry.self, from: data)
+            } catch {
+                // Only log errors for entries that should be decodable (assistant entries)
+                // User entries, summary entries, etc. are expected to fail decoding
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let entryType = json["type"] as? String,
+                   entryType == "assistant" {
+                    Logger.parser.error("Failed to decode assistant entry: \(line) - Error: \(error)")
+                }
+                return nil
+            }
+        }
+    }
+    
     /// Parse a JSONL file and return valid usage entries with deduplication
     func parseJSONLFile(at url: URL, enableDeduplication: Bool = true) throws -> [UsageEntry] {
         Logger.parser.debug("📖 Reading JSONL file: \(url.lastPathComponent)")
@@ -68,9 +92,14 @@ class JSONLParser {
             return nil
         }
         
-        // Parse as JSON and check for required fields
+        // Parse as JSON and check if this is an assistant entry
         do {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
+            
+            // Only process assistant entries - they contain usage data
+            guard let entryType = json["type"] as? String, entryType == "assistant" else {
                 return nil
             }
             
@@ -117,11 +146,7 @@ class JSONLParser {
             let requestId = json["requestId"] as? String
             let costUSD = json["costUSD"] as? Double
             
-            // Generate ID
-            let id = messageId ?? UUID().uuidString
-            
             return UsageEntry(
-                id: id,
                 timestamp: timestamp,
                 model: model,
                 tokenCounts: tokenCounts,
@@ -129,7 +154,7 @@ class JSONLParser {
                 sessionId: json["sessionId"] as? String,
                 projectPath: nil,
                 requestId: requestId,
-                messageId: messageId
+                originalMessageId: messageId
             )
             
         } catch {
