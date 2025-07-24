@@ -8,6 +8,36 @@ final class FileMonitorTests: XCTestCase {
     var fileMonitor: FileMonitor!
     var cancellables: Set<AnyCancellable>!
     
+    // MARK: - Async Condition Waiting Utility
+    
+    /// Waits for a condition to become true by polling every 100ms
+    /// - Parameters:
+    ///   - condition: The condition to check
+    ///   - timeout: Maximum time to wait in seconds (default: 5.0)
+    ///   - pollInterval: How often to check the condition in seconds (default: 0.1)
+    /// - Throws: XCTestError if timeout is reached
+    func waitForCondition(
+        _ condition: @escaping () async -> Bool,
+        timeout: TimeInterval = 5.0,
+        pollInterval: TimeInterval = 0.1
+    ) async throws {
+        let startTime = Date()
+        
+        while Date().timeIntervalSince(startTime) < timeout {
+            if await condition() {
+                return
+            }
+            
+            try await Task.sleep(nanoseconds: UInt64(pollInterval * 100_000_000))
+        }
+        
+        throw NSError(
+            domain: "TestTimeout",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Condition not met within \(timeout) seconds"]
+        )
+    }
+    
     override func setUp() {
         super.setUp()
         
@@ -56,10 +86,11 @@ final class FileMonitorTests: XCTestCase {
         await fileMonitor.startMonitoring()
         
         // Should not start monitoring without access
+        // TODO proper waiting
         XCTAssertFalse(fileMonitor.isMonitoring)
     }
     
-    func testFileMonitorWithAccess() async {
+    func testFileMonitorWithAccess() async throws {
         // Ensure access is granted
         let accessGranted = await mockAccessManager.requestHomeDirectoryAccess()
         XCTAssertTrue(accessGranted)
@@ -68,7 +99,9 @@ final class FileMonitorTests: XCTestCase {
         await fileMonitor.startMonitoring()
         
         // Should start monitoring with access
-        XCTAssertTrue(fileMonitor.isMonitoring)
+        try await waitForCondition {
+            return self.fileMonitor.isMonitoring
+        }
     }
     
     // MARK: - File Change Detection Tests
@@ -78,19 +111,20 @@ final class FileMonitorTests: XCTestCase {
         _ = await mockAccessManager.requestHomeDirectoryAccess()
         await fileMonitor.startMonitoring()
         
-        // Wait for FSEvents to fully initialize (1+ seconds for stream + latency)
-        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        // Wait for monitoring to be active
+        try await waitForCondition {
+            return self.fileMonitor.isMonitoring
+        }
         
-        // Set up expectation for file changes
-        let expectation = XCTestExpectation(description: "File addition detected")
+        // Allow FSEvents to fully initialize (FSEvents has internal latency)
+//        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        
+        // Set up file change collection
         var detectedFiles: [URL] = []
         
         fileMonitor.fileChanges
             .sink { urls in
                 detectedFiles.append(contentsOf: urls)
-                if !urls.isEmpty {
-                    expectation.fulfill()
-                }
             }
             .store(in: &cancellables)
         
@@ -111,8 +145,10 @@ final class FileMonitorTests: XCTestCase {
         try newContent.write(to: newFileURL, atomically: true, encoding: .utf8)
         sync() // Force filesystem flush
         
-        // Wait for FSEvents detection (1 second latency + 0.5 second debounce + buffer)
-        await fulfillment(of: [expectation], timeout: 3.0)
+        // Wait for file to be detected
+        try await waitForCondition {
+            return detectedFiles.contains { $0.lastPathComponent == "new_file.jsonl" }
+        }
         
         // Verify the file was detected
         XCTAssertTrue(detectedFiles.contains { $0.lastPathComponent == "new_file.jsonl" },
@@ -124,19 +160,17 @@ final class FileMonitorTests: XCTestCase {
         _ = await mockAccessManager.requestHomeDirectoryAccess()
         await fileMonitor.startMonitoring()
         
-        // Wait for FSEvents to fully initialize
-        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        // Wait for monitoring to be active
+        try await waitForCondition {
+            return self.fileMonitor.isMonitoring
+        }
         
-        // Set up expectation for file changes
-        let expectation = XCTestExpectation(description: "File modification detected")
+        // Set up file change collection
         var detectedFiles: [URL] = []
         
         fileMonitor.fileChanges
             .sink { urls in
                 detectedFiles.append(contentsOf: urls)
-                if !urls.isEmpty {
-                    expectation.fulfill()
-                }
             }
             .store(in: &cancellables)
         
@@ -163,8 +197,10 @@ final class FileMonitorTests: XCTestCase {
         try modifiedContent.write(to: existingFileURL, atomically: true, encoding: .utf8)
         sync() // Force filesystem flush
         
-        // Wait for FSEvents detection
-        await fulfillment(of: [expectation], timeout: 3.0)
+        // Wait for file modification to be detected
+        try await waitForCondition {
+            return detectedFiles.contains { $0.lastPathComponent == "sample.jsonl" }
+        }
         
         // Verify the file was detected
         XCTAssertTrue(detectedFiles.contains { $0.lastPathComponent == "sample.jsonl" },
@@ -176,19 +212,17 @@ final class FileMonitorTests: XCTestCase {
         _ = await mockAccessManager.requestHomeDirectoryAccess()
         await fileMonitor.startMonitoring()
         
-        // Wait for FSEvents to fully initialize
-        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        // Wait for monitoring to be active
+        try await waitForCondition {
+            return self.fileMonitor.isMonitoring
+        }
         
-        // Set up expectation for file changes
-        let expectation = XCTestExpectation(description: "New directory with files detected")
+        // Set up file change collection
         var detectedFiles: [URL] = []
         
         fileMonitor.fileChanges
             .sink { urls in
                 detectedFiles.append(contentsOf: urls)
-                if !urls.isEmpty {
-                    expectation.fulfill()
-                }
             }
             .store(in: &cancellables)
         
@@ -204,9 +238,6 @@ final class FileMonitorTests: XCTestCase {
         // Create directory first
         try FileManager.default.createDirectory(at: newDirURL, withIntermediateDirectories: true)
         
-        // Longer delay to let directory creation propagate through FSEvents
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
         let newFileURL = newDirURL.appendingPathComponent("project.jsonl")
         let newContent = """
         {"type":"assistant","uuid":"new-project-uuid","timestamp":"2025-07-23T17:00:00.000Z","sessionId":"new-project-session","message":{"model":"claude-3-5-sonnet-20241022","usage":{"input_tokens":500,"output_tokens":250}}}
@@ -215,8 +246,10 @@ final class FileMonitorTests: XCTestCase {
         try newContent.write(to: newFileURL, atomically: true, encoding: .utf8)
         sync() // Force filesystem flush
         
-        // Wait longer for FSEvents detection of new directory + file
-        await fulfillment(of: [expectation], timeout: 5.0)
+        // Wait for new file in new directory to be detected
+        try await waitForCondition {
+            return detectedFiles.contains { $0.lastPathComponent == "project.jsonl" }
+        }
         
         // Verify the file was detected
         XCTAssertTrue(detectedFiles.contains { $0.lastPathComponent == "project.jsonl" },
@@ -228,22 +261,17 @@ final class FileMonitorTests: XCTestCase {
         _ = await mockAccessManager.requestHomeDirectoryAccess()
         await fileMonitor.startMonitoring()
         
-        // Wait for FSEvents to fully initialize
-        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        // Wait for monitoring to be active
+        try await waitForCondition {
+            return self.fileMonitor.isMonitoring
+        }
         
-        // Set up expectation - we expect NO changes for non-JSONL files
-        let expectation = XCTestExpectation(description: "No changes detected for non-JSONL files")
-        expectation.isInverted = true // We expect this NOT to be fulfilled
+        // Set up file change collection
+        var detectedFiles: [URL] = []
         
-        var detectedAnyFiles = false
         fileMonitor.fileChanges
             .sink { urls in
-                // Only count files as detected if they match the non-JSONL file we're testing
-                let nonJSONLDetected = urls.contains { $0.lastPathComponent == "readme.txt" }
-                if nonJSONLDetected {
-                    detectedAnyFiles = true
-                    expectation.fulfill() // This should NOT happen
-                }
+                detectedFiles.append(contentsOf: urls)
             }
             .store(in: &cancellables)
         
@@ -259,17 +287,26 @@ final class FileMonitorTests: XCTestCase {
         try "This is not a JSONL file".write(to: nonJSONLFileURL, atomically: true, encoding: .utf8)
         sync() // Force filesystem flush
         
-        // Wait sufficient time for FSEvents to potentially detect the change
-        // but expect that it will be filtered out
-        await fulfillment(of: [expectation], timeout: 3.0)
+        // Wait a reasonable time to ensure no non-JSONL files are detected
+        // If they were going to be detected, they would appear within 3 seconds
+        do {
+            try await waitForCondition({
+                return detectedFiles.contains { $0.lastPathComponent == "readme.txt" }
+            }, timeout: 3.0)
+            // If we get here, the non-JSONL file was detected (which is bad)
+            XCTFail("Non-JSONL files should be filtered out by FSEvents processing")
+        } catch {
+            // This is expected - the condition should timeout because non-JSONL files should be ignored
+        }
         
         // Verify no non-JSONL files were detected
-        XCTAssertFalse(detectedAnyFiles, "Non-JSONL files should be filtered out by FSEvents processing")
+        XCTAssertFalse(detectedFiles.contains { $0.lastPathComponent == "readme.txt" },
+                      "Non-JSONL files should be filtered out by FSEvents processing")
     }
     
     // MARK: - Monitoring State Tests
     
-    func testStartStopMonitoring() async {
+    func testStartStopMonitoring() async throws {
         // Ensure access
         _ = await mockAccessManager.requestHomeDirectoryAccess()
         
@@ -278,18 +315,20 @@ final class FileMonitorTests: XCTestCase {
         
         // Start monitoring
         await fileMonitor.startMonitoring()
-        XCTAssertTrue(fileMonitor.isMonitoring)
+        try await waitForCondition {
+            return self.fileMonitor.isMonitoring
+        }
         
         // Stop monitoring
         fileMonitor.stopMonitoring()
         
-        // Give it a moment to stop
-        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-        
-        XCTAssertFalse(fileMonitor.isMonitoring)
+        // Wait for monitoring to stop
+        try await waitForCondition {
+            return !self.fileMonitor.isMonitoring
+        }
     }
     
-    func testDoubleStartMonitoring() async {
+    func testDoubleStartMonitoring() async throws {
         // Ensure access
         _ = await mockAccessManager.requestHomeDirectoryAccess()
         
@@ -298,7 +337,9 @@ final class FileMonitorTests: XCTestCase {
         await fileMonitor.startMonitoring()
         
         // Should still be monitoring (no crash or issues)
-        XCTAssertTrue(fileMonitor.isMonitoring)
+        try await waitForCondition {
+            return self.fileMonitor.isMonitoring
+        }
     }
     
 }

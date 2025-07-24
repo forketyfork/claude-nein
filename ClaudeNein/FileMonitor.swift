@@ -41,18 +41,9 @@ class FileMonitor: ObservableObject {
     
     /// Starts monitoring the Claude directory for `.jsonl` file changes.
     func startMonitoring() async {
-        guard !isMonitoring else {
-            Logger.fileMonitor.info("File monitoring is already active.")
-            return
-        }
-        
         guard accessManager.hasValidAccess else {
             Logger.fileMonitor.warning("Cannot start monitoring without directory access.")
             return
-        }
-        
-        await MainActor.run {
-            self.isMonitoring = true
         }
         
         monitorQueue.async { [weak self] in
@@ -76,6 +67,11 @@ class FileMonitor: ObservableObject {
     // MARK: - Private Setup and Teardown
     
     private func setupFSEventsMonitoring() {
+        guard !isMonitoring else {
+            Logger.fileMonitor.info("File monitoring is already active.")
+            return
+        }
+        
         guard let claudeDir = accessManager.claudeDirectoryURL else {
             Logger.fileMonitor.error("Failed to get Claude directory URL.")
             return
@@ -164,6 +160,9 @@ class FileMonitor: ObservableObject {
             FSEventStreamRelease(eventStream)
             self.eventStream = nil
         }
+        
+        self.isMonitoring = true
+
     }
     
     private func teardownFSEventsMonitoring() {
