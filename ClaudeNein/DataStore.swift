@@ -283,6 +283,57 @@ class DataStore {
         }
         return breakdown
     }
+
+    // MARK: - Pricing Storage
+
+    /// Save fetched pricing data to Core Data
+    func saveModelPricing(_ pricing: ModelPricing) {
+        context.perform {
+            let fetch = NSFetchRequest<NSFetchRequestResult>(entityName: "ModelPriceEntity")
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetch)
+            _ = try? self.context.execute(deleteRequest)
+
+            for (name, price) in pricing.models {
+                let entity = ModelPriceEntity(context: self.context)
+                entity.modelName = name
+                entity.inputPrice = price.inputPrice
+                entity.outputPrice = price.outputPrice
+                entity.cacheCreationPrice = price.cacheCreationPrice ?? 0
+                entity.cacheReadPrice = price.cacheReadPrice ?? 0
+            }
+
+            if self.context.hasChanges {
+                do {
+                    try self.context.save()
+                    self.logger.info("💾 Saved pricing for \(pricing.models.count) models")
+                } catch {
+                    self.logger.error("Failed to save pricing: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    /// Load pricing data from Core Data
+    func loadModelPricing() -> ModelPricing? {
+        var result: ModelPricing?
+        context.performAndWait {
+            let request: NSFetchRequest<ModelPriceEntity> = ModelPriceEntity.fetchRequest()
+            if let entities = try? self.context.fetch(request), !entities.isEmpty {
+                var models: [String: ModelPrice] = [:]
+                for entity in entities {
+                    let price = ModelPrice(
+                        inputPrice: entity.inputPrice,
+                        outputPrice: entity.outputPrice,
+                        cacheCreationPrice: entity.cacheCreationPrice > 0 ? entity.cacheCreationPrice : nil,
+                        cacheReadPrice: entity.cacheReadPrice > 0 ? entity.cacheReadPrice : nil
+                    )
+                    models[entity.modelName] = price
+                }
+                result = ModelPricing(models: models)
+            }
+        }
+        return result
+    }
 }
 
 @objc(UsageEntryEntity)
@@ -304,5 +355,20 @@ class UsageEntryEntity: NSManagedObject {
 extension UsageEntryEntity {
     @nonobjc public class func fetchRequest() -> NSFetchRequest<UsageEntryEntity> {
         return NSFetchRequest<UsageEntryEntity>(entityName: "UsageEntryEntity")
+    }
+}
+
+@objc(ModelPriceEntity)
+class ModelPriceEntity: NSManagedObject {
+    @NSManaged var modelName: String
+    @NSManaged var inputPrice: Double
+    @NSManaged var outputPrice: Double
+    @NSManaged var cacheCreationPrice: Double
+    @NSManaged var cacheReadPrice: Double
+}
+
+extension ModelPriceEntity {
+    @nonobjc public class func fetchRequest() -> NSFetchRequest<ModelPriceEntity> {
+        return NSFetchRequest<ModelPriceEntity>(entityName: "ModelPriceEntity")
     }
 }

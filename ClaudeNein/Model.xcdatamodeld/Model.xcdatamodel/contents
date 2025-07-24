@@ -14,4 +14,11 @@
         <attribute name="requestId" attributeType="String" isOptional="YES"/>
         <attribute name="messageId" attributeType="String" isOptional="YES"/>
     </entity>
+    <entity name="ModelPriceEntity" representedClassName="ModelPriceEntity">
+        <attribute name="modelName" attributeType="String" isOptional="NO"/>
+        <attribute name="inputPrice" attributeType="Double" isOptional="NO"/>
+        <attribute name="outputPrice" attributeType="Double" isOptional="NO"/>
+        <attribute name="cacheCreationPrice" attributeType="Double" isOptional="YES"/>
+        <attribute name="cacheReadPrice" attributeType="Double" isOptional="YES"/>
+    </entity>
 </model>

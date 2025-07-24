@@ -4,29 +4,38 @@ import OSLog
 /// Manages pricing data for Claude models and calculates costs
 class PricingManager {
     static let shared = PricingManager()
-    
+
     private let userDefaults = UserDefaults.standard
     private let pricingCacheKey = "cached_pricing_data"
     private let pricingCacheTimeKey = "cached_pricing_time"
-    private let cacheExpirationHours: Double = 24
+    private let cacheExpirationHours: Double = 4
+    private let refreshIntervalHours: Double = 4
+    private var refreshTimer: Timer?
+    private let dataStore = DataStore.shared
     private let parser = LiteLLMParser()
     
     private var cachedPricing: ModelPricing?
     private var isInitialFetchComplete = false
     private var dataSource: PricingDataSource = .bundled
-    
+
     private init() {
         Logger.calculator.debug("🔧 Initializing PricingManager")
         loadCachedPricing()
+        if let dbPricing = dataStore.loadModelPricing() {
+            cachedPricing = dbPricing
+            dataSource = .cache
+            Logger.calculator.info("💾 Loaded pricing data from database (\(dbPricing.models.count) models)")
+        }
     }
     
     /// Initialize pricing data at app startup
     func initializePricingData() async {
         Logger.calculator.info("🚀 Starting initial pricing data fetch")
-        
+
         do {
             let pricing = try await fetchPricingFromAPI()
             cachePricing(pricing)
+            dataStore.saveModelPricing(pricing)
             dataSource = .api
             Logger.calculator.info("✅ Successfully fetched and cached pricing data from LiteLLM API (\(pricing.models.count) models)")
         } catch {
@@ -44,6 +53,7 @@ class PricingManager {
         
         isInitialFetchComplete = true
         Logger.calculator.info("🏁 Initial pricing data setup complete using: \(self.dataSource.description)")
+        startRefreshTimer()
     }
     
     /// Get current pricing data, using cache if available
@@ -209,6 +219,27 @@ class PricingManager {
         let cacheTime = userDefaults.double(forKey: pricingCacheTimeKey)
         let expirationTime = cacheTime + (cacheExpirationHours * 3600)
         return Date().timeIntervalSince1970 > expirationTime
+    }
+
+    private func startRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshIntervalHours * 3600, repeats: true) { [weak self] _ in
+            Task {
+                await self?.refreshPricing()
+            }
+        }
+    }
+
+    @objc private func refreshPricing() async {
+        do {
+            let pricing = try await fetchPricingFromAPI()
+            cachePricing(pricing)
+            dataStore.saveModelPricing(pricing)
+            dataSource = .api
+            Logger.calculator.info("✅ Refreshed pricing data from API")
+        } catch {
+            Logger.calculator.warning("⚠️ Scheduled pricing fetch failed: \(error.localizedDescription)")
+        }
     }
 }
 
