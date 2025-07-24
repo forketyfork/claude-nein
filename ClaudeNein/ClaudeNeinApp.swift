@@ -23,6 +23,7 @@ struct ClaudeNeinApp: App {
 
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
+    private var rollingNumberView: RollingNumberNSView?
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -88,7 +89,7 @@ class MenuBarManager: ObservableObject {
             return
         }
         
-        updateStatusBarTitle()
+        setupRollingNumberView()
         statusButton.action = #selector(menuBarButtonClicked)
         statusButton.target = self
         
@@ -326,14 +327,41 @@ class MenuBarManager: ObservableObject {
     
     // MARK: - Private Helper Methods
     
-    private func updateStatusBarTitle() {
+    private func setupRollingNumberView() {
         guard let statusButton = statusItem?.button else {
-            Logger.menuBar.error("❌ Cannot update status bar title - no status button")
+            Logger.menuBar.error("❌ Cannot setup rolling number view - no status button")
             return
         }
-        let title = formatCurrency(currentSummary.todaySpend)
-        statusButton.title = title
-        Logger.menuBar.debug("📱 Updated status bar title: \(title)")
+        
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "en_US")
+        
+        rollingNumberView = RollingNumberNSView(formatter: formatter)
+        
+        guard let rollingView = rollingNumberView else { return }
+        
+        statusButton.title = ""
+        statusButton.addSubview(rollingView)
+        
+        rollingView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            rollingView.centerXAnchor.constraint(equalTo: statusButton.centerXAnchor),
+            rollingView.centerYAnchor.constraint(equalTo: statusButton.centerYAnchor)
+        ])
+        
+        rollingView.updateValue(currentSummary.todaySpend)
+        Logger.menuBar.debug("🎬 Rolling number view setup completed")
+    }
+    
+    private func updateStatusBarTitle() {
+        guard let rollingView = rollingNumberView else {
+            Logger.menuBar.error("❌ Cannot update status bar - no rolling number view")
+            return
+        }
+        
+        rollingView.updateValue(currentSummary.todaySpend)
+        Logger.menuBar.debug("📱 Updated rolling number display: $\(String(format: "%.2f", self.currentSummary.todaySpend))")
     }
     
     private func formatCurrency(_ amount: Double, label: String? = nil) -> String {
