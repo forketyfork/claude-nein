@@ -59,3 +59,4 @@ This is a macOS menu bar application that monitors Claude Code spending in real-
 - Handle user data securely
 - No network requests except for pricing updates
 - Respect user privacy preferences
+
