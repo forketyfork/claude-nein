@@ -10,28 +10,31 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 
 ## Features
 
-- **Real-Time Menu Bar Display**: See your total spend for the current day directly in the menu bar. The icon updates automatically.
-- **Detailed Spend Summaries**: A dropdown menu provides breakdowns of your spending for today, the current week, and the current month.
-- **Model-Specific Costs**: See a breakdown of costs per model, so you know which ones are contributing most to your bill.
-- **Automatic & Efficient Monitoring**: The app uses modern file system watching APIs to detect changes in your Claude log files with minimal performance impact.
-- **Persistent Data Storage**: Usage data is stored locally using Core Data for fast access and reliable persistence across app restarts.
-- **Database Management**: Built-in "Reload Database" functionality allows you to clear cached data and start fresh when needed.
-- **Secure & Private**: All processing happens locally on your machine. The app only reads log files and makes no other network requests, except to fetch updated pricing information.
-- **Home Directory Access Control**: The app guides you to grant access to the home directory if needed and allows you to revoke it at any time.
-- **Up-to-Date Pricing**: Automatically fetches the latest pricing data from the LiteLLM project, with bundled data as a reliable fallback.
+- **Real-Time Menu Bar Display** – today's spend appears in the menu bar and animates smoothly when the value changes.
+- **Detailed Spend Summaries** – the dropdown menu shows totals for today, this week and this month.
+- **Model‑Specific Costs** – see which models account for the most spend.
+- **Automatic & Efficient Monitoring** – uses FSEvents to watch Claude log files with minimal overhead.
+- **Persistent Data Storage** – usage is cached locally in Core Data so data survives restarts.
+- **Database Management** – built in "Reload Database" command clears and reloads cached usage.
+- **Secure & Private** – all processing happens on your Mac; the only network request fetches pricing information.
+- **Home Directory Access Control** – you explicitly grant and revoke access to the Claude data directory.
+- **Up‑to‑Date Pricing** – pricing data is pulled from LiteLLM with cached and bundled fallbacks, and the current data source is displayed in the menu.
 
 ## How It Works
 
-1.  **Permissions**: The app first ensures it has the necessary read-only access to your home directory to find the Claude log files.
-2.  **File Monitoring**: It identifies Claude project directories (e.g., `~/.claude/`) and starts monitoring the `.jsonl` log files within them for any changes.
-3.  **Parsing**: When a file is changed (i.e., new API calls are logged), the app parses the new entries to extract usage data like model, token counts, and timestamps.
+1.  **Permissions** – at first launch you grant read‑only access to your home directory via a security‑scoped bookmark.
+2.  **File Monitoring** – the app searches `~/.claude/projects` and `~/.config/claude/projects` for `.jsonl` logs and monitors them with FSEvents.
+3.  **Parsing** – changed files are parsed and deduplicated, extracting model names, timestamps and token counts including cache tokens.
 4.  **Data Storage**: Parsed usage entries are stored in a local Core Data database with intelligent deduplication to prevent duplicate entries.
 5.  **Cost Calculation**: Using the latest pricing data, it calculates the cost for each entry and aggregates spending data from the database.
 6.  **UI Update**: It displays the aggregated costs in the menu bar and detailed dropdown menu, with real-time updates as new data arrives.
 
 ## Installation
 
-TBD
+1. Open `ClaudeNein.xcodeproj` in Xcode (15 or later).
+2. Select the **ClaudeNein** scheme.
+3. Build and run the project to launch the menu bar app.
+4. To run the unit tests use `xcodebuild test -scheme ClaudeNein -destination 'platform=macOS'`.
 
 ## Technical Details
 
@@ -42,9 +45,10 @@ TBD
 
 ### Data Source
 
-The app monitors Claude Code `.jsonl` files located in standard Claude config directories, such as:
+The app monitors Claude Code `.jsonl` files located in your Claude configuration directories, for example:
 
--   `~/.claude/`
+- `~/.claude/projects/`
+- `~/.config/claude/projects/`
 
 ### Project Structure
 
