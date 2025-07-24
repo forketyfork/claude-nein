@@ -17,10 +17,16 @@ class PricingManager {
     private var cachedPricing: ModelPricing?
     private var isInitialFetchComplete = false
     private var dataSource: PricingDataSource = .bundled
+    private(set) var lastFetchDate: Date = .distantPast
 
     private init() {
         Logger.calculator.debug("🔧 Initializing PricingManager")
         loadCachedPricing()
+        // Restore last fetch time from user defaults if available
+        let timestamp = userDefaults.double(forKey: pricingCacheTimeKey)
+        if timestamp > 0 {
+            lastFetchDate = Date(timeIntervalSince1970: timestamp)
+        }
         if let dbPricing = dataStore.loadModelPricing() {
             cachedPricing = dbPricing
             dataSource = .cache
@@ -71,6 +77,11 @@ class PricingManager {
     /// Get information about the current data source
     func getCurrentDataSource() -> PricingDataSource {
         return dataSource
+    }
+
+    /// Get the time pricing data was last fetched
+    func getLastFetchDate() -> Date {
+        return lastFetchDate
     }
     
     /// Calculate cost for a usage entry with cost mode support
@@ -179,12 +190,14 @@ class PricingManager {
     
     private func cachePricing(_ pricing: ModelPricing) {
         Logger.calculator.debug("💾 Attempting to cache pricing data")
-        
+
         do {
             let encoder = JSONEncoder()
             let data = try encoder.encode(pricing)
             userDefaults.set(data, forKey: pricingCacheKey)
-            userDefaults.set(Date().timeIntervalSince1970, forKey: pricingCacheTimeKey)
+            let now = Date()
+            userDefaults.set(now.timeIntervalSince1970, forKey: pricingCacheTimeKey)
+            lastFetchDate = now
             cachedPricing = pricing
             Logger.calculator.info("💾 Successfully cached pricing data (\(pricing.models.count) models)")
         } catch {
@@ -209,6 +222,10 @@ class PricingManager {
             let decoder = JSONDecoder()
             cachedPricing = try decoder.decode(ModelPricing.self, from: data)
             dataSource = .cache
+            let timestamp = userDefaults.double(forKey: pricingCacheTimeKey)
+            if timestamp > 0 {
+                lastFetchDate = Date(timeIntervalSince1970: timestamp)
+            }
             Logger.calculator.info("💾 Loaded cached pricing data (\(self.cachedPricing?.models.count ?? 0) models)")
         } catch {
             Logger.calculator.error("❌ Failed to load cached pricing data: \(error.localizedDescription)")
@@ -228,6 +245,11 @@ class PricingManager {
                 await self?.refreshPricing()
             }
         }
+    }
+
+    /// Manually trigger a pricing refresh
+    func refreshPricingNow() async {
+        await refreshPricing()
     }
 
     @objc private func refreshPricing() async {
