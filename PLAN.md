@@ -43,7 +43,8 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [x] Create `PricingManager` class:
   - [x] Fetch LiteLLM pricing data from API
   - [x] Implement offline fallback with bundled pricing data
-  - [x] Cache pricing data locally with expiration
+- [x] Cache pricing data locally with expiration
+- [x] Persist pricing data to Core Data with 4h refresh schedule
 - [x] Implement cost calculation logic:
   - [x] Calculate costs from token counts using model pricing
   - [x] Handle different token types (input, output, cache)
