@@ -169,33 +169,35 @@ class DataStore {
     
     /// Fetch all usage entries from the database
     func fetchAllEntries() -> [UsageEntry] {
-        let request: NSFetchRequest<UsageEntryEntity> = UsageEntryEntity.fetchRequest()
-        
-        do {
-            let results = try context.fetch(request)
-            // Transform entities back into the `UsageEntry` struct
-            return results.map { entity in
-                UsageEntry(
-                    id: entity.uniqueHash ?? UUID().uuidString, // Fallback to new UUID if hash is missing
-                    timestamp: entity.timestamp,
-                    model: entity.model,
-                    tokenCounts: TokenCounts(
-                        input: Int(entity.inputTokens),
-                        output: Int(entity.outputTokens),
-                        cacheCreation: entity.cacheCreationTokens > 0 ? Int(entity.cacheCreationTokens) : nil,
-                        cacheRead: entity.cacheReadTokens > 0 ? Int(entity.cacheReadTokens) : nil
-                    ),
-                    cost: entity.cost,
-                    sessionId: entity.sessionId?.isEmpty == true ? nil : entity.sessionId,
-                    projectPath: entity.projectPath?.isEmpty == true ? nil : entity.projectPath,
-                    requestId: entity.requestId?.isEmpty == true ? nil : entity.requestId,
-                    originalMessageId: entity.messageId?.isEmpty == true ? nil : entity.messageId
-                )
+        var results: [UsageEntry] = []
+        context.performAndWait {
+            let request: NSFetchRequest<UsageEntryEntity> = UsageEntryEntity.fetchRequest()
+
+            do {
+                let entities = try context.fetch(request)
+                results = entities.map { entity in
+                    UsageEntry(
+                        id: entity.uniqueHash ?? UUID().uuidString,
+                        timestamp: entity.timestamp,
+                        model: entity.model,
+                        tokenCounts: TokenCounts(
+                            input: Int(entity.inputTokens),
+                            output: Int(entity.outputTokens),
+                            cacheCreation: entity.cacheCreationTokens > 0 ? Int(entity.cacheCreationTokens) : nil,
+                            cacheRead: entity.cacheReadTokens > 0 ? Int(entity.cacheReadTokens) : nil
+                        ),
+                        cost: entity.cost,
+                        sessionId: entity.sessionId?.isEmpty == true ? nil : entity.sessionId,
+                        projectPath: entity.projectPath?.isEmpty == true ? nil : entity.projectPath,
+                        requestId: entity.requestId?.isEmpty == true ? nil : entity.requestId,
+                        originalMessageId: entity.messageId?.isEmpty == true ? nil : entity.messageId
+                    )
+                }
+            } catch {
+                self.logger.error("Failed to fetch all entries: \(error.localizedDescription)")
             }
-        } catch {
-            logger.error("Failed to fetch all entries: \(error.localizedDescription)")
-            return []
         }
+        return results
     }
 
 
@@ -223,25 +225,29 @@ class DataStore {
 
     /// Calculate spend summary directly in the database using SQL aggregates
     func fetchSpendSummary() -> SpendSummary {
-        let now = Date()
-        let calendar = Calendar.current
-        let todayStart = calendar.startOfDay(for: now)
-        let weekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? todayStart
-        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? todayStart
-        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? now
+        var summary = SpendSummary()
+        context.performAndWait {
+            let now = Date()
+            let calendar = Calendar.current
+            let todayStart = calendar.startOfDay(for: now)
+            let weekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? todayStart
+            let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? todayStart
+            let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? now
 
-        let todaySpend = sumCost(start: todayStart, end: now)
-        let weekSpend = sumCost(start: weekStart, end: now)
-        let monthSpend = sumCost(start: monthStart, end: monthEnd)
-        let breakdown = modelBreakdown(start: monthStart, end: monthEnd)
+            let todaySpend = sumCost(start: todayStart, end: now)
+            let weekSpend = sumCost(start: weekStart, end: now)
+            let monthSpend = sumCost(start: monthStart, end: monthEnd)
+            let breakdown = modelBreakdown(start: monthStart, end: monthEnd)
 
-        return SpendSummary(
-            todaySpend: todaySpend,
-            weekSpend: weekSpend,
-            monthSpend: monthSpend,
-            lastUpdated: now,
-            modelBreakdown: breakdown
-        )
+            summary = SpendSummary(
+                todaySpend: todaySpend,
+                weekSpend: weekSpend,
+                monthSpend: monthSpend,
+                lastUpdated: now,
+                modelBreakdown: breakdown
+            )
+        }
+        return summary
     }
 
     // MARK: - Private query helpers
