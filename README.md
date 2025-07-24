@@ -36,6 +36,13 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 3. Build and run the project to launch the menu bar app.
 4. To run the unit tests use `xcodebuild test -scheme ClaudeNein -destination 'platform=macOS'`.
 
+### Prebuilt Unsigned App
+
+1. Open the **Actions** tab on GitHub and select the latest **Build unsigned app** workflow run.
+2. Download the `ClaudeNein-unsigned.zip` artifact and unzip it.
+3. Move `ClaudeNein.app` to your `/Applications` folder.
+4. Because the app is unsigned, right-click the app and choose **Open** the first time you launch it to bypass Gatekeeper.
+
 ## Technical Details
 
 -   **Language**: Swift

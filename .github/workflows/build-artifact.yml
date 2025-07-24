@@ -1,0 +1,33 @@
+name: Build unsigned app
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project ClaudeNein.xcodeproj \
+            -scheme ClaudeNein \
+            -configuration Release \
+            -derivedDataPath build
+      - name: Package app
+        run: |
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent build/Build/Products/Release/ClaudeNein.app dist/ClaudeNein-unsigned.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClaudeNein-unsigned
+          path: dist/ClaudeNein-unsigned.zip

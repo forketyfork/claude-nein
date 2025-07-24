@@ -168,7 +168,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [ ] Minimum macOS version support
   - [ ] Universal binary (Intel + Apple Silicon)
 - [ ] Create build scripts:
-  - [ ] Archive and export workflow
+  - [x] Archive and export workflow
   - [ ] Automated testing in CI
 - [ ] Prepare for distribution:
   - [ ] App store preparation (if applicable)
