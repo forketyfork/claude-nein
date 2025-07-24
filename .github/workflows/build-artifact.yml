@@ -1,0 +1,40 @@
+name: Build unsigned app
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags: [ "*" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+      - name: Set build version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project ClaudeNein.xcodeproj \
+            -scheme ClaudeNein \
+            -configuration Release \
+            -derivedDataPath build \
+            MARKETING_VERSION="$VERSION"
+      - name: Package app
+        run: |
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent build/Build/Products/Release/ClaudeNein.app "dist/ClaudeNein-${VERSION}-unsigned.zip"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClaudeNein-${{ env.VERSION }}-unsigned
+          path: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
+      - name: Create draft release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
