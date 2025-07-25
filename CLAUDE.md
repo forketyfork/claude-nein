@@ -23,30 +23,42 @@ This is a macOS menu bar application that monitors Claude Code spending in real-
 - Use MARK comments to organize code sections
 - Keep view models separate from views
 - Create dedicated managers for different concerns (FileMonitor, PricingManager, etc.)
+- Follow the established project structure:
+  - `ClaudeNeinApp.swift` - Main app entry point with integrated MenuBarManager
+  - `Models.swift` - All data models and structures
+  - `DataStore.swift` - Core Data persistence layer
+  - `*Manager.swift` - Dedicated manager classes for specific functionality
+  - `*View.swift` - SwiftUI view components
 
 ## Development Practices
-- Always handle errors gracefully
-- Use background queues for file system operations
-- Never block the main thread
-- Implement proper memory management
-- Use dependency injection for testability
+- Always handle errors gracefully with proper Swift error handling
+- Use background queues for file system operations and data processing
+- Never block the main thread - use `@MainActor` and `DispatchQueue.main.async` appropriately
+- Implement proper memory management with weak references where needed
+- Use dependency injection for testability (see `FileMonitor` with `DirectoryAccessManager`)
 - Write unit tests for core business logic
+- Use the centralized `Logger` system for all logging needs
+- Follow Core Data best practices with proper context management
 - **ALWAYS update PLAN.md to check off completed steps after implementing features**
 - **ALWAYS build the project using `xcodebuild` before completing any task to ensure no compilation errors**
 - **ALWAYS run the tests before completing any task**: `xcodebuild test -scheme ClaudeNein -destination 'platform=macOS'`
 
 ## Architecture Patterns
-- Use MVVM pattern with SwiftUI
-- Implement observer pattern for real-time updates
-- Use Swift's Combine framework for reactive programming
+- Use MVVM pattern with SwiftUI where applicable
+- Implement observer pattern for real-time updates using Combine publishers
+- Use Swift's Combine framework for reactive programming (see `FileMonitor.fileChanges`)
 - Separate data models from UI models
+- Use the single responsibility principle - each manager handles one concern
+- Follow the centralized architecture with `MenuBarManager` as the main coordinator
 
 ## Performance Considerations
-- Monitor file system efficiently with FSEvents
-- Cache processed data appropriately
-- Use lazy loading for large datasets
-- Debounce rapid updates to prevent UI thrashing
-- Optimize menu bar icon updates
+- Monitor file system efficiently with FSEvents (implemented in `FileMonitor`)
+- Cache processed data appropriately using Core Data persistence
+- Use lazy loading for large datasets and incremental parsing
+- Debounce rapid updates to prevent UI thrashing (see file change debouncing)
+- Optimize menu bar icon updates with smooth animations
+- Process data on background queues to maintain UI responsiveness
+- Use efficient database queries with proper indexing
 
 ## Testing Requirements
 - Write unit tests for data processing logic

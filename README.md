@@ -2,7 +2,8 @@
 
 A native macOS menu bar application that monitors your Claude Code spending in real-time, providing intuitive visual feedback and detailed breakdowns.
 
-![Claude Nein Screenshot](...)
+![Claude Nein Screenshot](images/ClaudeNein1.png)
+![Claude Nein Screenshot](images/ClaudeNein2.png)
 
 ## Overview
 
@@ -17,9 +18,11 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 - **Persistent Data Storage** – usage is cached locally in Core Data so data survives restarts.
 - **Run at Startup Option** – enable automatic launch when you log in.
 - **Database Management** – built in "Reload Database" command clears and reloads cached usage.
+- **Spend Graphs** – interactive graph view showing spending trends by day, month, or year with navigation controls.
 - **Secure & Private** – all processing happens on your Mac; the only network request fetches pricing information.
 - **Claude Directory Access Control** – you explicitly grant and revoke access only to the Claude log directories.
 - **Up‑to‑Date Pricing** – pricing data is pulled from LiteLLM with cached and bundled fallbacks, and the current data source is displayed in the menu.
+- **Comprehensive Logging** – centralized logging system for debugging and monitoring app behavior.
 
 ## How It Works
 
@@ -46,9 +49,14 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 ## Technical Details
 
 -   **Language**: Swift
--   **Framework**: SwiftUI for the core logic, AppKit for menu bar integration
--   **Platform**: macOS
--   **Architecture**: The app runs as a background agent (`NSStatusItem`) managed by a central `MenuBarManager`. It uses a `FileMonitor` for observing the file system and a `SpendCalculator` for business logic.
+-   **Framework**: SwiftUI for UI components, AppKit for menu bar integration
+-   **Platform**: macOS (menu bar app)
+-   **Data Storage**: Core Data for persistent local storage
+-   **Architecture**: The app runs as a background agent (`NSStatusItem`) managed by a central `MenuBarManager` class. It uses:
+    - `FileMonitor` for observing file system changes with FSEvents
+    - `DataStore` for Core Data persistence and spend calculations
+    - `PricingManager` for fetching and caching model pricing data
+    - `HomeDirectoryAccessManager` for handling secure file access permissions
 
 ### Data Source
 
@@ -63,18 +71,21 @@ The project is organized as follows:
 
 ```
 ClaudeNein/
-├── ClaudeNeinApp.swift         # Main app entry point
-├── MenuBarManager.swift        # Core class managing the status item and menu
-├── Models.swift                # Data models (UsageEntry, SpendSummary, etc.)
-├── DataStore.swift             # Core Data persistence layer for usage entries
-├── Model.xcdatamodeld/         # Core Data model definition
-├── FileMonitor.swift           # Monitors the file system for log changes
+├── ClaudeNeinApp.swift              # Main app entry point with MenuBarManager
+├── Models.swift                     # Data models (UsageEntry, SpendSummary, etc.)
+├── DataStore.swift                  # Core Data persistence layer for usage entries
+├── Model.xcdatamodeld/              # Core Data model definition
+├── FileMonitor.swift                # Monitors the file system for log changes
 ├── HomeDirectoryAccessManager.swift # Handles permissions for home directory access
-├── SpendCalculator.swift       # Calculates spend totals and breakdowns
-├── PricingManager.swift        # Fetches and manages model pricing data
-├── JSONLParser.swift           # Parses `.jsonl` log files
-├── LiteLLMParser.swift         # Parses pricing data from LiteLLM source
-└── ... (other supporting files)
+├── DirectoryAccessManager.swift     # Additional directory access management
+├── SpendCalculator.swift            # Calculates spend totals and breakdowns
+├── PricingManager.swift             # Fetches and manages model pricing data
+├── JSONLParser.swift                # Parses `.jsonl` log files
+├── LiteLLMParser.swift              # Parses pricing data from LiteLLM source
+├── LaunchAtLoginManager.swift       # Manages launch at login functionality
+├── SpendGraphView.swift             # SwiftUI view for spending graphs
+├── Logger.swift                     # Centralized logging system
+└── Assets.xcassets/                 # App icons and assets
 ```
 
 ## Privacy & Security
