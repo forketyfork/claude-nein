@@ -32,7 +32,7 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 5.  **Cost Calculation**: Using the latest pricing data, it calculates the cost for each entry and aggregates spending data from the database.
 6.  **UI Update**: It displays the aggregated costs in the menu bar and detailed dropdown menu, with real-time updates as new data arrives.
 
-## Installation
+## Running From Sources
 
 1. Open `ClaudeNein.xcodeproj` in Xcode (15 or later).
 2. Select the **ClaudeNein** scheme.
@@ -45,6 +45,7 @@ The app is not yet published to the App Store, so the process of installing it i
 2. Unzip the archive and move `ClaudeNein.app` to your `/Applications` folder.
 3. Reset the quarantine flag on the app: `xattr -d com.apple.quarantine /Applications/ClaudeNein.app`
 4. Because the app is unsigned, right-click the app and choose **Open** the first time to bypass Gatekeeper.
+5. On first run, the app will ask you for access to the Claude directories.
 
 ## Technical Details
 
