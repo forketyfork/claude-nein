@@ -24,6 +24,7 @@ struct DataPoint {
 struct SpendGraphView: View {
     @State private var period: GraphPeriod = .day
     @State private var dataPoints: [DataPoint] = []
+    @State private var selectedDate: Date = Date()
 
     private let dataStore = DataStore.shared
 
@@ -36,6 +37,40 @@ struct SpendGraphView: View {
             }
             .pickerStyle(SegmentedPickerStyle())
             .padding()
+            
+            // Navigation controls
+            HStack {
+                Spacer()
+                
+                HStack(spacing: 16) {
+                    Button(action: goToPrevious) {
+                        Image(systemName: "chevron.left")
+                            .foregroundColor(.accentColor)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .frame(width: 44, height: 44)
+                    
+                    Text(currentPeriodText)
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .frame(minWidth: 200, alignment: .center)
+                    
+                    Button(action: goToNext) {
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.accentColor)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(isNextDisabled)
+                    .frame(width: 44, height: 44)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal)
             
             VStack(alignment: .leading) {
                 Text("Cumulative Spend")
@@ -56,35 +91,45 @@ struct SpendGraphView: View {
         }
         .frame(minWidth: 900, minHeight: 700)
         .onAppear(perform: loadData)
-        .onChange(of: period) { _ in loadData() }
+        .onChange(of: period) { _ in 
+            selectedDate = Date()
+            loadData() 
+        }
+        .onChange(of: selectedDate) { _ in loadData() }
     }
 
     private func loadData() {
         let rawValues: [Double]
-        let currentDate = Date()
         let calendar = Calendar.current
         
         switch period {
         case .day:
-            rawValues = dataStore.hourlySpend(for: currentDate)
+            rawValues = dataStore.hourlySpend(for: selectedDate)
         case .month:
-            rawValues = dataStore.dailySpend(for: currentDate)
+            rawValues = dataStore.dailySpend(for: selectedDate)
         case .year:
-            rawValues = dataStore.monthlySpend(for: currentDate)
+            rawValues = dataStore.monthlySpend(for: selectedDate)
         }
         
         // Determine the current time position to limit data to present
         let currentTimeIndex: Int
-        switch period {
-        case .day:
-            currentTimeIndex = calendar.component(.hour, from: currentDate)
-        case .month:
-            currentTimeIndex = calendar.component(.day, from: currentDate) - 1 // 0-based
-        case .year:
-            currentTimeIndex = calendar.component(.month, from: currentDate) - 1 // 0-based
+        let isCurrentPeriod = calendar.isDate(selectedDate, equalTo: Date(), toGranularity: periodGranularity)
+        
+        if isCurrentPeriod {
+            switch period {
+            case .day:
+                currentTimeIndex = calendar.component(.hour, from: Date())
+            case .month:
+                currentTimeIndex = calendar.component(.day, from: Date()) - 1 // 0-based
+            case .year:
+                currentTimeIndex = calendar.component(.month, from: Date()) - 1 // 0-based
+            }
+        } else {
+            // For past periods, show all data
+            currentTimeIndex = rawValues.count - 1
         }
         
-        // Only show data up to current time
+        // Only show data up to current time (for current period) or all data (for past periods)
         let limitedValues = Array(rawValues.prefix(currentTimeIndex + 1))
         
         // Convert to cumulative values and create data points with labels
@@ -99,11 +144,82 @@ struct SpendGraphView: View {
         }
     }
     
+    private var periodGranularity: Calendar.Component {
+        switch period {
+        case .day:
+            return .day
+        case .month:
+            return .month
+        case .year:
+            return .year
+        }
+    }
+    
+    private var currentPeriodText: String {
+        let formatter = DateFormatter()
+        switch period {
+        case .day:
+            formatter.dateFormat = "EEEE, MMM d, yyyy"
+            return formatter.string(from: selectedDate)
+        case .month:
+            formatter.dateFormat = "MMMM yyyy"
+            return formatter.string(from: selectedDate)
+        case .year:
+            formatter.dateFormat = "yyyy"
+            return formatter.string(from: selectedDate)
+        }
+    }
+    
+    private var isNextDisabled: Bool {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        switch period {
+        case .day:
+            return calendar.isDate(selectedDate, inSameDayAs: now) || selectedDate > now
+        case .month:
+            let selectedMonth = calendar.component(.month, from: selectedDate)
+            let selectedYear = calendar.component(.year, from: selectedDate)
+            let currentMonth = calendar.component(.month, from: now)
+            let currentYear = calendar.component(.year, from: now)
+            return (selectedYear == currentYear && selectedMonth >= currentMonth) || selectedYear > currentYear
+        case .year:
+            let selectedYear = calendar.component(.year, from: selectedDate)
+            let currentYear = calendar.component(.year, from: now)
+            return selectedYear >= currentYear
+        }
+    }
+    
+    private func goToPrevious() {
+        let calendar = Calendar.current
+        switch period {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
+        case .year:
+            selectedDate = calendar.date(byAdding: .year, value: -1, to: selectedDate) ?? selectedDate
+        }
+    }
+    
+    private func goToNext() {
+        let calendar = Calendar.current
+        switch period {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate
+        case .year:
+            selectedDate = calendar.date(byAdding: .year, value: 1, to: selectedDate) ?? selectedDate
+        }
+    }
+    
     private func timeLabel(for index: Int) -> String {
         switch period {
         case .day:
             return String(format: "%02d:00", index)
         case .month:
+            // For month view, show day of month (1-31)
             return "\(index + 1)"
         case .year:
             let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
@@ -128,8 +244,10 @@ struct SpendGraphView: View {
             let stepCount = max(dataPoints.count - 1, 1)
             for i in 0...stepCount {
                 let x = graphArea.minX + CGFloat(i) * graphArea.width / CGFloat(stepCount)
-                path.move(to: CGPoint(x: x, y: graphArea.minY))
-                path.addLine(to: CGPoint(x: x, y: graphArea.maxY))
+                if x.isFinite {
+                    path.move(to: CGPoint(x: x, y: graphArea.minY))
+                    path.addLine(to: CGPoint(x: x, y: graphArea.maxY))
+                }
             }
         }
         .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
@@ -138,7 +256,7 @@ struct SpendGraphView: View {
     @ViewBuilder
     private func drawYAxisLabels(in size: CGSize) -> some View {
         let graphArea = CGRect(x: 60, y: 10, width: size.width - 90, height: size.height - 60)
-        let maxValue = dataPoints.map(\.y).max() ?? 1.0
+        let maxValue = max(dataPoints.map(\.y).max() ?? 1.0, 0.01)
         
         VStack(alignment: .trailing, spacing: 0) {
             ForEach(0...5, id: \.self) { i in
@@ -164,11 +282,13 @@ struct SpendGraphView: View {
                     let shouldShow = shouldShowXLabel(index: index, total: dataPoints.count)
                     if shouldShow {
                         let x = graphArea.minX + CGFloat(point.x) * graphArea.width / CGFloat(max(dataPoints.count - 1, 1))
-                        Text(point.label)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .rotationEffect(.degrees(-45))
-                            .position(x: x, y: graphArea.maxY + 25)
+                        if x.isFinite {
+                            Text(point.label)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .rotationEffect(.degrees(-45))
+                                .position(x: x, y: graphArea.maxY + 25)
+                        }
                     }
                 }
             }
@@ -186,19 +306,24 @@ struct SpendGraphView: View {
     private func drawLineGraph(in size: CGSize) -> some View {
         let graphArea = CGRect(x: 60, y: 10, width: size.width - 90, height: size.height - 60)
         
+        if !dataPoints.isEmpty {
+        
         if dataPoints.count > 1 {
-            let maxValue = dataPoints.map(\.y).max() ?? 1.0
+            let maxValue = max(dataPoints.map(\.y).max() ?? 1.0, 0.01)
             
             // Line path
             Path { path in
                 for (index, point) in dataPoints.enumerated() {
                     let x = graphArea.minX + CGFloat(point.x) * graphArea.width / CGFloat(max(dataPoints.count - 1, 1))
-                    let y = graphArea.maxY - (CGFloat(point.y / maxValue) * graphArea.height)
+                    let normalizedY = point.y.isFinite ? point.y / maxValue : 0.0
+                    let y = graphArea.maxY - (CGFloat(normalizedY) * graphArea.height)
                     
-                    if index == 0 {
-                        path.move(to: CGPoint(x: x, y: y))
-                    } else {
-                        path.addLine(to: CGPoint(x: x, y: y))
+                    if x.isFinite && y.isFinite {
+                        if index == 0 {
+                            path.move(to: CGPoint(x: x, y: y))
+                        } else {
+                            path.addLine(to: CGPoint(x: x, y: y))
+                        }
                     }
                 }
             }
@@ -207,13 +332,17 @@ struct SpendGraphView: View {
             // Data points
             ForEach(Array(dataPoints.enumerated()), id: \.offset) { index, point in
                 let x = graphArea.minX + CGFloat(point.x) * graphArea.width / CGFloat(max(dataPoints.count - 1, 1))
-                let y = graphArea.maxY - (CGFloat(point.y / maxValue) * graphArea.height)
+                let normalizedY = point.y.isFinite ? point.y / maxValue : 0.0
+                let y = graphArea.maxY - (CGFloat(normalizedY) * graphArea.height)
                 
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 4, height: 4)
-                    .position(x: x, y: y)
+                if x.isFinite && y.isFinite {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 4, height: 4)
+                        .position(x: x, y: y)
+                }
             }
+        }
         }
     }
 }
