@@ -114,7 +114,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [ ] Save user preferences
   - [ ] Handle preference changes
   - [ ] Provide sensible defaults
-- [ ] Add keyboard shortcuts:
+- [x] Add keyboard shortcuts:
   - [ ] Global hotkey to toggle menu (optional)
   - [ ] Standard menu shortcuts
   - [x] "Run at Startup" menu item with persistent toggle

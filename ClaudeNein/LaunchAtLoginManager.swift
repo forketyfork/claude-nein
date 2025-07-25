@@ -16,6 +16,9 @@ class LaunchAtLoginManager: ObservableObject {
     }
 
     private init() {
+        // Initialize isEnabled with a default value first
+        isEnabled = false
+        // Then set the actual value based on file existence
         isEnabled = fileManager.fileExists(atPath: agentURL.path)
     }
 
