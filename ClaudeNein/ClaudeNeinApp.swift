@@ -23,6 +23,8 @@ struct ClaudeNeinApp: App {
 
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
+
+    private var graphWindow: NSWindow?
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -174,16 +176,29 @@ class MenuBarManager: ObservableObject {
         let dataSourceItem = NSMenuItem(title: "Pricing: \(dataSource.description)", action: nil, keyEquivalent: "")
         dataSourceItem.isEnabled = false
         menu.addItem(dataSourceItem)
-        
+
+        let pricingTime = PricingManager.shared.getLastFetchDate()
+        let pricingTimeItem = NSMenuItem(title: "Pricing Updated: \(formatTime(pricingTime))", action: nil, keyEquivalent: "")
+        pricingTimeItem.isEnabled = false
+        menu.addItem(pricingTimeItem)
+
         menu.addItem(NSMenuItem.separator())
-        
+
         let refreshItem = NSMenuItem(title: "Refresh Data", action: #selector(refreshData), keyEquivalent: "r")
         refreshItem.target = self
         menu.addItem(refreshItem)
+
+        let refreshPricingItem = NSMenuItem(title: "Refresh Pricing", action: #selector(refreshPricing), keyEquivalent: "")
+        refreshPricingItem.target = self
+        menu.addItem(refreshPricingItem)
         
         let reloadDatabaseItem = NSMenuItem(title: "Reload Database", action: #selector(reloadDatabase), keyEquivalent: "")
         reloadDatabaseItem.target = self
         menu.addItem(reloadDatabaseItem)
+
+        let graphItem = NSMenuItem(title: "Show Spend Graph", action: #selector(showSpendGraph), keyEquivalent: "g")
+        graphItem.target = self
+        menu.addItem(graphItem)
         
         let accessItemTitle = homeDirectoryAccessManager.hasValidAccess ? "Revoke Home Directory Access" : "Grant Home Directory Access"
         let accessAction = homeDirectoryAccessManager.hasValidAccess ? #selector(revokeAccess) : #selector(requestAccess)
@@ -208,6 +223,16 @@ class MenuBarManager: ObservableObject {
         Logger.app.info("🔄 Manual refresh requested")
         Task {
             await processAllJsonlFiles()
+        }
+    }
+
+    @objc private func refreshPricing() {
+        Logger.app.info("🔄 Manual pricing refresh requested")
+        Task {
+            await PricingManager.shared.refreshPricingNow()
+            await MainActor.run {
+                self.updateMenu()
+            }
         }
     }
     
@@ -247,6 +272,19 @@ class MenuBarManager: ObservableObject {
     @objc private func revokeAccess() {
         Logger.security.info("🚫 User requested to revoke home directory access")
         homeDirectoryAccessManager.revokeAccess()
+    }
+
+    @objc private func showSpendGraph() {
+        if graphWindow == nil {
+            let view = SpendGraphView()
+            let hosting = NSHostingController(rootView: view)
+            graphWindow = NSWindow(contentViewController: hosting)
+            graphWindow?.title = "Claude Spend Graph"
+            graphWindow?.styleMask.insert(.titled)
+            graphWindow?.setContentSize(NSSize(width: 400, height: 300))
+        }
+        graphWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     @objc private func quitApp() {
