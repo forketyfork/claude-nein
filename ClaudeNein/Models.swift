@@ -178,6 +178,21 @@ struct TokenCounts: Codable, Equatable {
     }
 }
 
+/// Usage information from Claude API responses
+struct ClaudeUsage: Codable {
+    let inputTokens: Int?
+    let outputTokens: Int? 
+    let cacheCreationInputTokens: Int?
+    let cacheReadInputTokens: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case cacheCreationInputTokens = "cache_creation_input_tokens"
+        case cacheReadInputTokens = "cache_read_input_tokens"
+    }
+}
+
 /// Summary data structure for UI display
 struct SpendSummary: Equatable {
     let todaySpend: Double
