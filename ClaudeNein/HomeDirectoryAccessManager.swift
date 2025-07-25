@@ -100,7 +100,7 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
                 var isStale = false
                 let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
                 if isStale {
-                    Logger.security.warning("⚠️ Bookmark for \(directoriesToMonitor[index].lastPathComponent) is stale")
+                    Logger.security.warning("⚠️ Bookmark for \(self.directoriesToMonitor[index].lastPathComponent) is stale")
                     removeStoredBookmark(forKey: key)
                     continue
                 }
@@ -131,35 +131,37 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
 
     private func requestAccess(for directory: URL, bookmarkKey: String) async -> Bool {
         await withCheckedContinuation { continuation in
-            let panel = NSOpenPanel()
-            panel.title = "Grant Access"
-            panel.message = "Please grant access to \(directory.path)"
-            panel.prompt = "Grant Access"
-            panel.canChooseFiles = false
-            panel.canChooseDirectories = true
-            panel.allowsMultipleSelection = false
-            panel.canCreateDirectories = false
-            panel.directoryURL = directory
+            Task { @MainActor in
+                let panel = NSOpenPanel()
+                panel.title = "Grant Access"
+                panel.message = "Please grant access to \(directory.path)"
+                panel.prompt = "Grant Access"
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.allowsMultipleSelection = false
+                panel.canCreateDirectories = false
+                panel.directoryURL = directory
 
-            panel.begin { [weak self] result in
-                guard let self = self, result == .OK, let url = panel.url else {
-                    continuation.resume(returning: false)
-                    return
-                }
+                panel.begin { [weak self] result in
+                    guard let self = self, result == .OK, let url = panel.url else {
+                        continuation.resume(returning: false)
+                        return
+                    }
 
-                do {
-                    let bookmarkData = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-                    if url.startAccessingSecurityScopedResource() {
-                        self.securedURLs.append(url)
-                        UserDefaults.standard.set(bookmarkData, forKey: bookmarkKey)
-                        UserDefaults.standard.synchronize()
-                        continuation.resume(returning: true)
-                    } else {
+                    do {
+                        let bookmarkData = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                        if url.startAccessingSecurityScopedResource() {
+                            self.securedURLs.append(url)
+                            UserDefaults.standard.set(bookmarkData, forKey: bookmarkKey)
+                            UserDefaults.standard.synchronize()
+                            continuation.resume(returning: true)
+                        } else {
+                            continuation.resume(returning: false)
+                        }
+                    } catch {
+                        Logger.security.error("❌ Failed to create bookmark: \(error.localizedDescription)")
                         continuation.resume(returning: false)
                     }
-                } catch {
-                    Logger.security.error("❌ Failed to create bookmark: \(error.localizedDescription)")
-                    continuation.resume(returning: false)
                 }
             }
         }

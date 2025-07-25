@@ -183,7 +183,7 @@ class MenuBarManager: ObservableObject {
         pricingTimeItem.isEnabled = false
         menu.addItem(pricingTimeItem)
 
-        let accessStatusItem = NSMenuItem(title: homeDirectoryAccessManager.hasValidAccess ? "Access Granted" : "Access Needed", action: nil, keyEquivalent: "")
+        let accessStatusItem = NSMenuItem(title: homeDirectoryAccessManager.hasValidAccess ? "Folder Access Granted" : "Folder Access Needed", action: nil, keyEquivalent: "")
         accessStatusItem.image = NSImage(systemSymbolName: homeDirectoryAccessManager.hasValidAccess ? "checkmark.circle" : "xmark.circle", accessibilityDescription: nil)
         accessStatusItem.isEnabled = false
         menu.addItem(accessStatusItem)
@@ -276,6 +276,10 @@ class MenuBarManager: ObservableObject {
             if granted {
                 await processAllJsonlFiles()
             }
+            // Refresh the menu to update the access status
+            await MainActor.run {
+                updateMenu()
+            }
             Logger.security.info("🔒 Home directory access request result: \(granted)")
         }
     }
@@ -283,6 +287,8 @@ class MenuBarManager: ObservableObject {
     @objc private func revokeAccess() {
         Logger.security.info("🚫 User requested to revoke home directory access")
         homeDirectoryAccessManager.revokeAccess()
+        // Refresh the menu to update the access status
+        updateMenu()
     }
 
     @objc private func showSpendGraph() {

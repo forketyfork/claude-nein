@@ -751,6 +751,23 @@ struct SpendCalculatorTests {
         try #require(breakdown.count == 2)
     }
     
+    @Test func testModelBreakdownFiltersSyntheticModels() throws {
+        let calculator = SpendCalculator()
+        
+        let normalEntry = createTestEntry(id: "normal-1", model: "claude-3-5-sonnet-20241022", cost: 2.0)
+        let syntheticEntry = createTestEntry(id: "synthetic-1", model: "<synthetic>", cost: 1.5)
+        let anotherNormalEntry = createTestEntry(id: "normal-2", model: "claude-3-haiku-20240307", cost: 0.5)
+        
+        let entries = [normalEntry, syntheticEntry, anotherNormalEntry]
+        let breakdown = calculator.calculateModelBreakdown(from: entries)
+        
+        // Should only include non-synthetic models
+        #expect(breakdown["claude-3-5-sonnet-20241022"] == 2.0)
+        #expect(breakdown["claude-3-haiku-20240307"] == 0.5)
+        #expect(breakdown["<synthetic>"] == nil) // Should be filtered out
+        #expect(breakdown.count == 2) // Only 2 models, synthetic filtered out
+    }
+    
     // Helper method to create test entries
     private func createTestEntry(
         id: String,

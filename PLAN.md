@@ -98,7 +98,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] "Refresh Pricing" menu item
   - [x] Display pricing last fetched time in menu
   - [x] "Grant/Revoke Access" menu items for home directory permissions
-  - [x] Permission status icon in menu
+  - [x] Permission status icon in menu (improved UX with per-directory bookmarks)
   - [x] "Reload Database" menu item with confirmation dialog for clearing all cached data
   - [x] "Quit" menu item
 - [x] Style menu for native macOS look:

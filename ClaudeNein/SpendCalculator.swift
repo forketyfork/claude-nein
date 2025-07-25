@@ -56,6 +56,10 @@ class SpendCalculator {
         var breakdown: [String: Double] = [:]
         
         for entry in entries {
+            // Filter out synthetic models
+            if entry.model == "<synthetic>" {
+                continue
+            }
             let cost = pricingManager.calculateCost(for: entry, mode: costMode)
             breakdown[entry.model, default: 0.0] += cost
         }
