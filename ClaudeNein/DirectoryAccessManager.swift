@@ -10,6 +10,9 @@ protocol DirectoryAccessManager {
     
     /// Get the URL for the projects directory within the .claude directory
     var claudeProjectsDirectoryURL: URL? { get }
+
+    /// All Claude directories that we have access to
+    var claudeDirectories: [URL] { get }
     
     /// Request access to the directory (async for UI prompts in production)
     /// - Returns: True if access was granted, false otherwise

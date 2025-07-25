@@ -72,19 +72,25 @@ class FileMonitor: ObservableObject {
             return
         }
         
-        guard let claudeDir = accessManager.claudeDirectoryURL else {
-            Logger.fileMonitor.error("Failed to get Claude directory URL.")
+        let directories = accessManager.claudeDirectories
+        guard !directories.isEmpty else {
+            Logger.fileMonitor.error("Failed to get Claude directories")
             return
         }
-        
-        // Verify the Claude directory exists
+
         let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: claudeDir.path) else {
-            Logger.fileMonitor.warning("Claude directory does not exist: \(claudeDir.path)")
-            return
+        var existingPaths: [String] = []
+        for dir in directories {
+            if fileManager.fileExists(atPath: dir.path) {
+                existingPaths.append(dir.path)
+            } else {
+                Logger.fileMonitor.warning("Claude directory does not exist: \(dir.path)")
+            }
         }
-        
-        Logger.fileMonitor.info("🔍 Starting FSEvents monitoring for: \(claudeDir.path)")
+
+        guard !existingPaths.isEmpty else { return }
+
+        Logger.fileMonitor.info("🔍 Starting FSEvents monitoring for: \(existingPaths.joined(separator: ", "))")
         
         // FSEvents callback that processes file system events
         let callback: FSEventStreamCallback = { _, clientCallBackInfo, numEvents, eventPaths, eventFlags, eventIds in
@@ -133,7 +139,7 @@ class FileMonitor: ObservableObject {
             kCFAllocatorDefault,
             callback,
             &context,
-            [claudeDir.path] as CFArray,
+            existingPaths as CFArray,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             1.0, // 1 second latency for debouncing
             FSEventStreamCreateFlags(
