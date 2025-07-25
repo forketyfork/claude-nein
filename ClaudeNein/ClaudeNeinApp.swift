@@ -168,20 +168,12 @@ class MenuBarManager: ObservableObject {
         
         menu.addItem(NSMenuItem.separator())
         
-        let lastUpdated = NSMenuItem(title: "Updated: \(formatTime(currentSummary.lastUpdated))", action: nil, keyEquivalent: "")
-        lastUpdated.isEnabled = false
-        menu.addItem(lastUpdated)
-        
         // Add pricing data source information
         let dataSource = PricingManager.shared.getCurrentDataSource()
-        let dataSourceItem = NSMenuItem(title: "Pricing: \(dataSource.description)", action: nil, keyEquivalent: "")
-        dataSourceItem.isEnabled = false
-        menu.addItem(dataSourceItem)
-
         let pricingTime = PricingManager.shared.getLastFetchDate()
-        let pricingTimeItem = NSMenuItem(title: "Pricing Updated: \(formatTime(pricingTime))", action: nil, keyEquivalent: "")
-        pricingTimeItem.isEnabled = false
-        menu.addItem(pricingTimeItem)
+        let pricingItem = NSMenuItem(title: "Pricing: \(dataSource.description) (Updated: \(formatTime(pricingTime)))", action: nil, keyEquivalent: "")
+        pricingItem.isEnabled = false
+        menu.addItem(pricingItem)
 
         let accessStatusItem = NSMenuItem(title: homeDirectoryAccessManager.hasValidAccess ? "Folder Access Granted" : "Folder Access Needed", action: nil, keyEquivalent: "")
         accessStatusItem.image = NSImage(systemSymbolName: homeDirectoryAccessManager.hasValidAccess ? "checkmark.circle" : "xmark.circle", accessibilityDescription: nil)
