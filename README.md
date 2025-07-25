@@ -1,9 +1,8 @@
 # Claude Nein - Claude Code Spend Monitor
 
-A native macOS menu bar application that monitors your Claude Code spending in real-time, providing intuitive visual feedback and detailed breakdowns.
+A native macOS menu bar application that monitors your Claude Code spending in real-time, providing intuitive visual feedback and detailed breakdowns. Inspired by [ccusage](https://github.com/ryoppippi/ccusage/).
 
-![Claude Nein Screenshot](images/ClaudeNein1.png)
-![Claude Nein Screenshot](images/ClaudeNein2.png)
+<img src="images/ClaudeNein1.png" width="50%"> <img src="images/ClaudeNein2.png" width="50%">
 
 ## Overview
 
