@@ -17,12 +17,12 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 - **Persistent Data Storage** – usage is cached locally in Core Data so data survives restarts.
 - **Database Management** – built in "Reload Database" command clears and reloads cached usage.
 - **Secure & Private** – all processing happens on your Mac; the only network request fetches pricing information.
-- **Home Directory Access Control** – you explicitly grant and revoke access to the Claude data directory.
+- **Claude Directory Access Control** – you explicitly grant and revoke access only to the Claude log directories.
 - **Up‑to‑Date Pricing** – pricing data is pulled from LiteLLM with cached and bundled fallbacks, and the current data source is displayed in the menu.
 
 ## How It Works
 
-1.  **Permissions** – at first launch you grant read‑only access to your home directory via a security‑scoped bookmark.
+1.  **Permissions** – on first launch you grant read‑only access to the `~/.claude` and `~/.config/claude` directories via a clear Yes/No dialog.
 2.  **File Monitoring** – the app searches `~/.claude/projects` and `~/.config/claude/projects` for `.jsonl` logs and monitors them with FSEvents.
 3.  **Parsing** – changed files are parsed and deduplicated, extracting model names, timestamps and token counts including cache tokens.
 4.  **Data Storage**: Parsed usage entries are stored in a local Core Data database with intelligent deduplication to prevent duplicate entries.

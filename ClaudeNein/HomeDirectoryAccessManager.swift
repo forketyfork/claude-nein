@@ -2,20 +2,30 @@ import Foundation
 import AppKit
 import OSLog
 
-/// Manages access to the user's home directory in a sandboxed environment
+/// Manages access to the Claude directories in a sandboxed environment
 class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
-    
+
     // MARK: - Properties
-    
+
     @Published private(set) var hasAccess = false
     @Published private(set) var isRequestingAccess = false
-    
-    private let bookmarkKey = "HomeDirectoryBookmark"
-    private var securedURL: URL?
+
+    private let bookmarkKeys = [
+        "ClaudeDirectoryBookmark",
+        "ConfigClaudeDirectoryBookmark"
+    ]
+
+    private var securedURLs: [URL] = []
+    private let directoriesToMonitor: [URL]
     
     // MARK: - Initialization
     
     init() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        directoriesToMonitor = [
+            home.appendingPathComponent(".claude", isDirectory: true),
+            home.appendingPathComponent(".config/claude", isDirectory: true)
+        ]
         checkExistingAccess()
     }
     
@@ -25,203 +35,148 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
     
     // MARK: - Public Methods
     
-    /// Request access to the user's home directory
+    /// Request access to the Claude directories
     /// - Returns: True if access was granted, false otherwise
     @discardableResult
     func requestHomeDirectoryAccess() async -> Bool {
-        if hasValidAccess {
-            return true
+        if hasValidAccess { return true }
+
+        let proceed = await MainActor.run { showAccessAlert() }
+        guard proceed else { return false }
+
+        await MainActor.run { isRequestingAccess = true }
+
+        var granted = false
+        for (index, directory) in directoriesToMonitor.enumerated() {
+            let key = bookmarkKeys[index]
+            if await requestAccess(for: directory, bookmarkKey: key) {
+                granted = true
+            }
         }
 
-        await MainActor.run {
-            isRequestingAccess = true
-        }
-        
-        defer {
-            Task { @MainActor in
-                isRequestingAccess = false
-            }
-        }
-        
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.main.async { [weak self] in
-                self?.showAccessRequestPanel { success in
-                    continuation.resume(returning: success)
-                }
-            }
-        }
+        await MainActor.run { isRequestingAccess = false }
+        hasAccess = granted
+        return granted
     }
     
     /// Check if we currently have access to the home directory
     var hasValidAccess: Bool {
-        return hasAccess && securedURL != nil
+        return hasAccess && !securedURLs.isEmpty
     }
-    
-    /// Get the secured home directory URL for file operations
-    /// - Returns: The secured URL if access is available, nil otherwise
     func getSecuredHomeDirectoryURL() -> URL? {
-        guard hasValidAccess else { return nil }
-        return securedURL
+        FileManager.default.homeDirectoryForCurrentUser
     }
     
     /// Get the URL for the .claude directory within the home directory
     var claudeDirectoryURL: URL? {
-        guard hasValidAccess, let homeURL = getSecuredHomeDirectoryURL() else {
-            return nil
-        }
-        return homeURL.appendingPathComponent(".claude", isDirectory: true)
+        return securedURLs.first
     }
     
     /// Get the URL for the projects directory within the .claude directory
     var claudeProjectsDirectoryURL: URL? {
-        guard let claudeDir = claudeDirectoryURL else {
-            return nil
-        }
-        return claudeDir.appendingPathComponent("projects", isDirectory: true)
+        guard let dir = claudeDirectoryURL else { return nil }
+        return dir.appendingPathComponent("projects", isDirectory: true)
     }
-    
-    /// Revoke access to the home directory
+
+    var claudeDirectories: [URL] {
+        return securedURLs
+    }
+
+    /// Revoke access to all directories
     func revokeAccess() {
         stopAccessingSecuredResource()
-        removeStoredBookmark()
-        
+        removeStoredBookmarks()
+        securedURLs.removeAll()
         hasAccess = false
-        securedURL = nil
-        
-        Logger.security.info("🚫 Home directory access revoked")
+        Logger.security.info("🚫 Claude directory access revoked")
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func checkExistingAccess() {
-        guard let bookmarkData = UserDefaults.standard.data(forKey: bookmarkKey) else {
-            Logger.security.debug("🔍 No existing home directory bookmark found")
-            return
-        }
-        
-        do {
-            var isStale = false
-            let restoredURL = try URL(
-                resolvingBookmarkData: bookmarkData,
-                options: .withSecurityScope,
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-            
-            if isStale {
-                Logger.security.warning("⚠️ Home directory bookmark is stale, access may be limited")
-                removeStoredBookmark()
-                return
-            }
-            
-            if restoredURL.startAccessingSecurityScopedResource() {
-                securedURL = restoredURL
-                hasAccess = true
-                Logger.security.info("✅ Restored home directory access from bookmark")
-            } else {
-                Logger.security.error("❌ Failed to start accessing home directory from bookmark")
-                removeStoredBookmark()
-            }
-            
-        } catch {
-            Logger.security.error("❌ Failed to restore home directory bookmark: \(error.localizedDescription)")
-            removeStoredBookmark()
-        }
-    }
-    
-    private func showAccessRequestPanel(completion: @escaping (Bool) -> Void) {
-        let panel = NSOpenPanel()
-        
-        // Configure the panel
-        panel.title = "Grant Home Directory Access"
-        panel.message = "ClaudeNein needs access to your home directory to monitor Claude config files.\n\nPlease select your home directory to grant permission."
-        panel.prompt = "Grant Access"
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = false
-        
-        // Set the default directory to the user's home
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-        
-        // Show the panel
-        panel.begin { [weak self] result in
-            guard let self = self else {
-                completion(false)
-                return
-            }
-            
-            if result == .OK, let selectedURL = panel.url {
-                self.handleDirectorySelection(selectedURL, completion: completion)
-            } else {
-                Logger.security.info("🚫 User cancelled home directory access request")
-                completion(false)
+        for (index, key) in bookmarkKeys.enumerated() {
+            guard let data = UserDefaults.standard.data(forKey: key) else { continue }
+            do {
+                var isStale = false
+                let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
+                if isStale {
+                    Logger.security.warning("⚠️ Bookmark for \(directoriesToMonitor[index].lastPathComponent) is stale")
+                    removeStoredBookmark(forKey: key)
+                    continue
+                }
+                if url.startAccessingSecurityScopedResource() {
+                    securedURLs.append(url)
+                    hasAccess = true
+                    Logger.security.info("✅ Restored access for \(url.lastPathComponent)")
+                } else {
+                    Logger.security.error("❌ Failed to access bookmarked directory: \(url.path)")
+                    removeStoredBookmark(forKey: key)
+                }
+            } catch {
+                Logger.security.error("❌ Failed to restore bookmark for \(key): \(error.localizedDescription)")
+                removeStoredBookmark(forKey: key)
             }
         }
     }
-    
-    private func handleDirectorySelection(_ selectedURL: URL, completion: @escaping (Bool) -> Void) {
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-        
-        // Verify the selected directory is the home directory or a parent that includes it
-        guard selectedURL.standardized.path == homeDirectory.standardized.path ||
-              homeDirectory.standardized.path.hasPrefix(selectedURL.standardized.path + "/") else {
-            
-            Logger.security.warning("⚠️ Selected directory does not provide access to home directory")
-            showInvalidSelectionAlert()
-            completion(false)
-            return
-        }
-        
-        // Create security-scoped bookmark
-        do {
-            let bookmarkData = try selectedURL.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            
-            // Store the bookmark
-            UserDefaults.standard.set(bookmarkData, forKey: bookmarkKey)
-            UserDefaults.standard.synchronize()
-            
-            // Start accessing the secured resource
-            if selectedURL.startAccessingSecurityScopedResource() {
-                stopAccessingSecuredResource() // Stop any previous access
-                securedURL = selectedURL
-                hasAccess = true
-                
-                Logger.security.info("✅ Successfully granted home directory access")
-                Logger.security.debug("📁 Secured access to: \(selectedURL.path, privacy: .private)")
-                
-                completion(true)
-            } else {
-                Logger.security.error("❌ Failed to start accessing selected directory")
-                completion(false)
-            }
-            
-        } catch {
-            Logger.security.error("❌ Failed to create security-scoped bookmark: \(error.localizedDescription)")
-            completion(false)
-        }
-    }
-    
-    private func showInvalidSelectionAlert() {
+
+    @MainActor
+    private func showAccessAlert() -> Bool {
         let alert = NSAlert()
-        alert.messageText = "Invalid Directory Selection"
-        alert.informativeText = "Please select your home directory to grant ClaudeNein access to Claude config files."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        
-        alert.runModal()
+        alert.messageText = "Allow Access to Claude Directories?"
+        alert.informativeText = "ClaudeNein needs read-only access to your Claude config directories to monitor spending."
+        alert.addButton(withTitle: "Allow")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
     }
-    
+
+    private func requestAccess(for directory: URL, bookmarkKey: String) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let panel = NSOpenPanel()
+            panel.title = "Grant Access"
+            panel.message = "Please grant access to \(directory.path)"
+            panel.prompt = "Grant Access"
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.canCreateDirectories = false
+            panel.directoryURL = directory
+
+            panel.begin { [weak self] result in
+                guard let self = self, result == .OK, let url = panel.url else {
+                    continuation.resume(returning: false)
+                    return
+                }
+
+                do {
+                    let bookmarkData = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                    if url.startAccessingSecurityScopedResource() {
+                        self.securedURLs.append(url)
+                        UserDefaults.standard.set(bookmarkData, forKey: bookmarkKey)
+                        UserDefaults.standard.synchronize()
+                        continuation.resume(returning: true)
+                    } else {
+                        continuation.resume(returning: false)
+                    }
+                } catch {
+                    Logger.security.error("❌ Failed to create bookmark: \(error.localizedDescription)")
+                    continuation.resume(returning: false)
+                }
+            }
+        }
+    }
+
     private func stopAccessingSecuredResource() {
-        securedURL?.stopAccessingSecurityScopedResource()
+        for url in securedURLs {
+            url.stopAccessingSecurityScopedResource()
+        }
     }
-    
-    private func removeStoredBookmark() {
-        UserDefaults.standard.removeObject(forKey: bookmarkKey)
+
+    private func removeStoredBookmark(forKey key: String) {
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
+    private func removeStoredBookmarks() {
+        for key in bookmarkKeys { removeStoredBookmark(forKey: key) }
         UserDefaults.standard.synchronize()
     }
 }
@@ -229,25 +184,17 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
 // MARK: - Extensions
 
 extension HomeDirectoryAccessManager {
-    
-    /// Convenience method to check if a specific path is accessible
-    /// - Parameter path: The file path to check
-    /// - Returns: True if the path is accessible through our secured URL
     func canAccess(path: String) -> Bool {
-        guard let securedURL = securedURL else { return false }
-        
-        let targetURL = URL(fileURLWithPath: path)
-        let securedPath = securedURL.standardized.path
-        let targetPath = targetURL.standardized.path
-        
-        return targetPath.hasPrefix(securedPath)
+        for url in securedURLs {
+            let securedPath = url.standardized.path
+            let targetPath = URL(fileURLWithPath: path).standardized.path
+            if targetPath.hasPrefix(securedPath) { return true }
+        }
+        return false
     }
-    
-    /// Get a URL for a path within the secured directory
-    /// - Parameter relativePath: Path relative to the secured directory
-    /// - Returns: URL if accessible, nil otherwise
+
     func securedURL(for relativePath: String) -> URL? {
-        guard let baseURL = securedURL else { return nil }
+        guard let baseURL = securedURLs.first else { return nil }
         return baseURL.appendingPathComponent(relativePath)
     }
 }

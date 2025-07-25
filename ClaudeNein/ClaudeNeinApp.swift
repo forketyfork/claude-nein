@@ -182,6 +182,11 @@ class MenuBarManager: ObservableObject {
         pricingTimeItem.isEnabled = false
         menu.addItem(pricingTimeItem)
 
+        let accessStatusItem = NSMenuItem(title: homeDirectoryAccessManager.hasValidAccess ? "Access Granted" : "Access Needed", action: nil, keyEquivalent: "")
+        accessStatusItem.image = NSImage(systemSymbolName: homeDirectoryAccessManager.hasValidAccess ? "checkmark.circle" : "xmark.circle", accessibilityDescription: nil)
+        accessStatusItem.isEnabled = false
+        menu.addItem(accessStatusItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let refreshItem = NSMenuItem(title: "Refresh Data", action: #selector(refreshData), keyEquivalent: "r")
@@ -312,21 +317,23 @@ class MenuBarManager: ObservableObject {
     }
     
     private func processAllJsonlFiles() async {
-        guard let claudeDir = homeDirectoryAccessManager.claudeDirectoryURL else {
-            Logger.app.error("❌ Cannot access Claude directory.")
+        let directories = homeDirectoryAccessManager.claudeDirectories
+        guard !directories.isEmpty else {
+            Logger.app.error("❌ Cannot access Claude directories.")
             return
         }
-        
-        Logger.app.info("🔍 Starting full scan of .jsonl files in \(claudeDir.path)")
-        
+
+        Logger.app.info("🔍 Starting full scan of .jsonl files in \(directories.count) directories")
+
+        var jsonlFiles: [URL] = []
         let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(at: claudeDir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) else {
-            Logger.app.error("❌ Failed to create directory enumerator.")
-            return
+        for dir in directories {
+            guard let enumerator = fileManager.enumerator(at: dir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) else {
+                continue
+            }
+            jsonlFiles += enumerator.allObjects.compactMap { $0 as? URL }.filter { $0.pathExtension == "jsonl" }
         }
-        
-        let jsonlFiles = enumerator.allObjects.compactMap { $0 as? URL }.filter { $0.pathExtension == "jsonl" }
-        
+
         await processChangedFiles(jsonlFiles)
     }
     
@@ -381,7 +388,7 @@ class MenuBarManager: ObservableObject {
         
         // If values are the same, no animation needed
         if abs(previousSpendValue - newValue) < 0.001 {
-            let title = formatCurrency(newValue)
+            let title = "💸 " + formatCurrency(newValue)
             statusButton.title = title
             Logger.menuBar.debug("📱 Updated status bar title (no change): \(title)")
             return
@@ -397,7 +404,7 @@ class MenuBarManager: ObservableObject {
         animateValueTransition(from: previousSpendValue, to: newValue) { [weak self] currentValue in
             DispatchQueue.main.async {
                 guard let self = self, let statusButton = self.statusItem?.button else { return }
-                let title = self.formatCurrency(currentValue)
+                let title = "💸 " + self.formatCurrency(currentValue)
                 statusButton.title = title
             }
         }

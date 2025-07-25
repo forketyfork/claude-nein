@@ -22,6 +22,11 @@ class MockDirectoryAccessManager: DirectoryAccessManager {
         guard let claudeDir = claudeDirectoryURL else { return nil }
         return claudeDir.appendingPathComponent("projects", isDirectory: true)
     }
+
+    var claudeDirectories: [URL] {
+        guard let claudeDir = claudeDirectoryURL else { return [] }
+        return [claudeDir]
+    }
     
     // MARK: - Initialization
     
