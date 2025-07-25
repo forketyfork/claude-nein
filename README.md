@@ -2,7 +2,8 @@
 
 A native macOS menu bar application that monitors your Claude Code spending in real-time, providing intuitive visual feedback and detailed breakdowns.
 
-![Claude Nein Screenshot](...)
+![Claude Nein Screenshot](images/ClaudeNein1.png)
+![Claude Nein Screenshot](images/ClaudeNein2.png)
 
 ## Overview
 
