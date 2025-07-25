@@ -40,10 +40,11 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 4. To run the unit tests use `xcodebuild test -scheme ClaudeNein -destination 'platform=macOS'`.
 
 ### Prebuilt Unsigned App
-
+The app is not yet published to the App Store, so the process of installing it is a bit convoluted:
 1. Visit the **Releases** page on GitHub and download the `ClaudeNein-<version>-unsigned.zip` asset for the tag you want.
 2. Unzip the archive and move `ClaudeNein.app` to your `/Applications` folder.
-3. Because the app is unsigned, right-click the app and choose **Open** the first time to bypass Gatekeeper.
+3. Reset the quarantine flag on the app: `xattr -d com.apple.quarantine /Applications/ClaudeNein.app`
+4. Because the app is unsigned, right-click the app and choose **Open** the first time to bypass Gatekeeper.
 
 ## Technical Details
 
