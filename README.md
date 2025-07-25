@@ -15,6 +15,7 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 - **Model‑Specific Costs** – see which models account for the most spend.
 - **Automatic & Efficient Monitoring** – uses FSEvents to watch Claude log files with minimal overhead.
 - **Persistent Data Storage** – usage is cached locally in Core Data so data survives restarts.
+- **Run at Startup Option** – enable automatic launch when you log in.
 - **Database Management** – built in "Reload Database" command clears and reloads cached usage.
 - **Secure & Private** – all processing happens on your Mac; the only network request fetches pricing information.
 - **Claude Directory Access Control** – you explicitly grant and revoke access only to the Claude log directories.

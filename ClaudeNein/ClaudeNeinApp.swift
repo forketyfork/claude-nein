@@ -32,6 +32,7 @@ class MenuBarManager: ObservableObject {
     
     private let fileMonitor: FileMonitor
     private let homeDirectoryAccessManager: HomeDirectoryAccessManager
+    private let launchAtLoginManager = LaunchAtLoginManager.shared
     private let dataStore = DataStore.shared
     
     // Animation properties
@@ -204,7 +205,12 @@ class MenuBarManager: ObservableObject {
         let graphItem = NSMenuItem(title: "Show Spend Graph", action: #selector(showSpendGraph), keyEquivalent: "g")
         graphItem.target = self
         menu.addItem(graphItem)
-        
+
+        let launchAtLoginItem = NSMenuItem(title: "Run at Startup", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        launchAtLoginItem.target = self
+        launchAtLoginItem.state = launchAtLoginManager.isEnabled ? .on : .off
+        menu.addItem(launchAtLoginItem)
+
         let accessItemTitle = homeDirectoryAccessManager.hasValidAccess ? "Revoke Home Directory Access" : "Grant Home Directory Access"
         let accessAction = homeDirectoryAccessManager.hasValidAccess ? #selector(revokeAccess) : #selector(requestAccess)
         let accessItem = NSMenuItem(title: accessItemTitle, action: accessAction, keyEquivalent: "")
@@ -290,6 +296,12 @@ class MenuBarManager: ObservableObject {
         }
         graphWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        Logger.app.info("🔄 Toggling Run at Login")
+        launchAtLoginManager.toggle()
+        updateMenu()
     }
     
     @objc private func quitApp() {
