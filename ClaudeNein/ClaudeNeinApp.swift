@@ -182,9 +182,6 @@ class MenuBarManager: ObservableObject {
 
         menu.addItem(NSMenuItem.separator())
 
-        let refreshItem = NSMenuItem(title: "Refresh Data", action: #selector(refreshData), keyEquivalent: "r")
-        refreshItem.target = self
-        menu.addItem(refreshItem)
 
         let refreshPricingItem = NSMenuItem(title: "Refresh Pricing", action: #selector(refreshPricing), keyEquivalent: "")
         refreshPricingItem.target = self
@@ -222,12 +219,6 @@ class MenuBarManager: ObservableObject {
         // This will be handled by the menu automatically
     }
     
-    @objc private func refreshData() {
-        Logger.app.info("🔄 Manual refresh requested")
-        Task {
-            await processAllJsonlFiles()
-        }
-    }
 
     @objc private func refreshPricing() {
         Logger.app.info("🔄 Manual pricing refresh requested")
