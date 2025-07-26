@@ -39,6 +39,10 @@ class MenuBarManager: ObservableObject {
     private var previousSpendValue: Double = 0.0
     private var animationTimer: Timer?
     
+    // Midnight detection properties
+    private var midnightTimer: Timer?
+    private var currentDate: Date = Date()
+    
     init() {
         Logger.app.info("🚀 Initializing ClaudeNein MenuBarManager")
         self.homeDirectoryAccessManager = HomeDirectoryAccessManager()
@@ -46,6 +50,7 @@ class MenuBarManager: ObservableObject {
         
         setupMenuBar()
         setupStateSubscriptions()
+        setupMidnightTimer()
         
         // Start the main asynchronous initialization
         Task {
@@ -83,6 +88,7 @@ class MenuBarManager: ObservableObject {
     deinit {
         Logger.app.info("🛑 Deinitializing MenuBarManager")
         animationTimer?.invalidate()
+        midnightTimer?.invalidate()
         statusItem = nil
         Logger.app.info("✅ MenuBarManager deinitialized")
     }
@@ -130,6 +136,46 @@ class MenuBarManager: ObservableObject {
                 self?.updateMenu()
             }
             .store(in: &cancellables)
+    }
+    
+    private func setupMidnightTimer() {
+        Logger.app.debug("🕛 Setting up midnight timer for daily rollover")
+        scheduleNextMidnightCheck()
+    }
+    
+    private func scheduleNextMidnightCheck() {
+        // Cancel existing timer
+        midnightTimer?.invalidate()
+        
+        let calendar = Calendar.current
+        let now = Date()
+        
+        // Get tomorrow's midnight
+        guard let nextMidnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else {
+            Logger.app.error("❌ Failed to calculate next midnight for timer")
+            return
+        }
+        
+        // Schedule timer to fire at next midnight
+        let timeInterval = nextMidnight.timeIntervalSince(now)
+        Logger.app.debug("🕛 Scheduling midnight timer to fire in \(String(format: "%.0f", timeInterval)) seconds")
+        
+        midnightTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { [weak self] _ in
+            self?.handleMidnightRollover()
+        }
+    }
+    
+    @objc private func handleMidnightRollover() {
+        Logger.app.info("🌅 Midnight rollover detected - refreshing spend data")
+        
+        // Update current date
+        currentDate = Date()
+        
+        // Refresh spending summary to reflect new day boundaries
+        refreshSpendingSummary()
+        
+        // Schedule the next midnight check
+        scheduleNextMidnightCheck()
     }
     
     private func setupMenu() {
