@@ -173,7 +173,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [ ] Configure build settings:
   - [ ] Code signing and notarization
   - [ ] Minimum macOS version support
-  - [ ] Universal binary (Intel + Apple Silicon)
+  - [x] Universal binary (Intel + Apple Silicon)
 - [x] Create build scripts:
   - [x] Archive and export workflow
   - [x] Automated testing workflow (xcodebuild commands documented)
