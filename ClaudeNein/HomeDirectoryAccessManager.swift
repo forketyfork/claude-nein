@@ -10,9 +10,9 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
     @Published private(set) var hasAccess = false
     @Published private(set) var isRequestingAccess = false
 
-    private let bookmarkKeys = [
-        "ClaudeDirectoryBookmark",
-        "ConfigClaudeDirectoryBookmark"
+    private let bookmarkKeys: [String: String] = [
+        "ClaudeDirectoryBookmark": ".claude/projects",
+        "ConfigClaudeDirectoryBookmark": ".config/claude/projects"
     ]
 
     private var securedURLs: [URL] = []
@@ -22,10 +22,9 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
     
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        directoriesToMonitor = [
-            home.appendingPathComponent(".claude", isDirectory: true),
-            home.appendingPathComponent(".config/claude", isDirectory: true)
-        ]
+        directoriesToMonitor = bookmarkKeys.values.map { relativePath in
+            home.appendingPathComponent(relativePath, isDirectory: true)
+        }
         checkExistingAccess()
     }
     
@@ -47,8 +46,8 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
         await MainActor.run { isRequestingAccess = true }
 
         var granted = false
-        for (index, directory) in directoriesToMonitor.enumerated() {
-            let key = bookmarkKeys[index]
+        for (key, relativePath) in bookmarkKeys {
+            let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(relativePath, isDirectory: true)
             if await requestAccess(for: directory, bookmarkKey: key) {
                 granted = true
             }
@@ -67,17 +66,6 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
         FileManager.default.homeDirectoryForCurrentUser
     }
     
-    /// Get the URL for the .claude directory within the home directory
-    var claudeDirectoryURL: URL? {
-        return securedURLs.first
-    }
-    
-    /// Get the URL for the projects directory within the .claude directory
-    var claudeProjectsDirectoryURL: URL? {
-        guard let dir = claudeDirectoryURL else { return nil }
-        return dir.appendingPathComponent("projects", isDirectory: true)
-    }
-
     var claudeDirectories: [URL] {
         return securedURLs
     }
@@ -94,13 +82,13 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
     // MARK: - Private Methods
 
     private func checkExistingAccess() {
-        for (index, key) in bookmarkKeys.enumerated() {
+        for (key, relativePath) in bookmarkKeys {
             guard let data = UserDefaults.standard.data(forKey: key) else { continue }
             do {
                 var isStale = false
                 let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
                 if isStale {
-                    Logger.security.warning("⚠️ Bookmark for \(self.directoriesToMonitor[index].lastPathComponent) is stale")
+                    Logger.security.warning("⚠️ Bookmark for \(relativePath) is stale")
                     removeStoredBookmark(forKey: key)
                     continue
                 }
@@ -178,7 +166,7 @@ class HomeDirectoryAccessManager: ObservableObject, DirectoryAccessManager {
     }
 
     private func removeStoredBookmarks() {
-        for key in bookmarkKeys { removeStoredBookmark(forKey: key) }
+        for key in bookmarkKeys.keys { removeStoredBookmark(forKey: key) }
         UserDefaults.standard.synchronize()
     }
 }
