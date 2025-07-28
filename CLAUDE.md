@@ -65,6 +65,7 @@ This is a macOS menu bar application that monitors Claude Code spending in real-
 - Test file monitoring functionality
 - Verify cost calculation accuracy
 - Create mock data for testing edge cases
+- **NEVER use `Date()` in tests - always use fixed dates to avoid flaky time-dependent tests**
 
 ## Security & Privacy
 - Request file system permissions appropriately

@@ -13,19 +13,14 @@ class MockDirectoryAccessManager: DirectoryAccessManager {
         return _hasValidAccess
     }
     
-    var claudeDirectoryURL: URL? {
-        guard hasValidAccess else { return nil }
-        return tempDirectoryURL.appendingPathComponent(".claude", isDirectory: true)
-    }
-    
     var claudeProjectsDirectoryURL: URL? {
-        guard let claudeDir = claudeDirectoryURL else { return nil }
-        return claudeDir.appendingPathComponent("projects", isDirectory: true)
+        guard hasValidAccess else { return nil }
+        return tempDirectoryURL.appendingPathComponent(".claude/projects", isDirectory: true)
     }
 
     var claudeDirectories: [URL] {
-        guard let claudeDir = claudeDirectoryURL else { return [] }
-        return [claudeDir]
+        guard let projectsDir = claudeProjectsDirectoryURL else { return [] }
+        return [projectsDir]
     }
     
     // MARK: - Initialization
@@ -76,9 +71,8 @@ class MockDirectoryAccessManager: DirectoryAccessManager {
             // Create the temporary directory structure
             try fileManager.createDirectory(at: tempDirectoryURL, withIntermediateDirectories: true)
             
-            guard let claudeDir = claudeDirectoryURL,
-                  let projectsDir = claudeProjectsDirectoryURL else {
-                print("Failed to get Claude directory URLs")
+            guard let projectsDir = claudeProjectsDirectoryURL else {
+                print("Failed to get Claude projects directory URL")
                 return
             }
             

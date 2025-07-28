@@ -5,12 +5,6 @@ protocol DirectoryAccessManager {
     /// Check if we currently have access to the monitored directory
     var hasValidAccess: Bool { get }
     
-    /// Get the URL for the .claude directory
-    var claudeDirectoryURL: URL? { get }
-    
-    /// Get the URL for the projects directory within the .claude directory
-    var claudeProjectsDirectoryURL: URL? { get }
-
     /// All Claude directories that we have access to
     var claudeDirectories: [URL] { get }
     

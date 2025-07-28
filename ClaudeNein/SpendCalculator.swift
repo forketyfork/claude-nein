@@ -1,15 +1,29 @@
 import Foundation
 import OSLog
 
+/// Protocol for cost calculation to enable dependency injection
+protocol CostCalculating {
+    func calculateCost(for entry: UsageEntry, mode: CostMode) -> Double
+    func calculateTotalCost(for entries: [UsageEntry], mode: CostMode) -> Double
+}
+
+/// Extension to make PricingManager conform to CostCalculating
+extension PricingManager: CostCalculating {}
+
 /// Handles spend aggregation for different time periods
 class SpendCalculator {
-    private let pricingManager = PricingManager.shared
+    private let costCalculator: CostCalculating
     private let calendar = Calendar.current
     
+    /// Initialize with dependency injection for cost calculator
+    init(costCalculator: CostCalculating = PricingManager.shared) {
+        self.costCalculator = costCalculator
+    }
+    
     /// Calculate spending summary from usage entries with cost mode support
-    func calculateSpendSummary(from entries: [UsageEntry], costMode: CostMode = .auto) -> SpendSummary {
+    func calculateSpendSummary(from entries: [UsageEntry], costMode: CostMode = .auto, referenceDate: Date = Date()) -> SpendSummary {
         Logger.calculator.debug("🔢 Calculating spend summary from \(entries.count) entries")
-        let now = Date()
+        let now = referenceDate
         
         // Filter entries by time periods
         let todayEntries = filterEntriesToday(entries, referenceDate: now)
@@ -19,9 +33,9 @@ class SpendCalculator {
         Logger.calculator.debug("📊 Filtered entries - Today: \(todayEntries.count), Week: \(weekEntries.count), Month: \(monthEntries.count)")
         
         // Calculate costs for each period using the specified cost mode
-        let todaySpend = pricingManager.calculateTotalCost(for: todayEntries, mode: costMode)
-        let weekSpend = pricingManager.calculateTotalCost(for: weekEntries, mode: costMode)
-        let monthSpend = pricingManager.calculateTotalCost(for: monthEntries, mode: costMode)
+        let todaySpend = costCalculator.calculateTotalCost(for: todayEntries, mode: costMode)
+        let weekSpend = costCalculator.calculateTotalCost(for: weekEntries, mode: costMode)
+        let monthSpend = costCalculator.calculateTotalCost(for: monthEntries, mode: costMode)
         
         // Calculate model breakdown for the month
         let modelBreakdown = calculateModelBreakdown(from: monthEntries, costMode: costMode)
@@ -40,7 +54,7 @@ class SpendCalculator {
     /// Calculate daily spend for a specific date with cost mode support
     func calculateDailySpend(from entries: [UsageEntry], for date: Date, costMode: CostMode = .auto) -> Double {
         let dayEntries = filterEntriesForDay(entries, date: date)
-        return pricingManager.calculateTotalCost(for: dayEntries, mode: costMode)
+        return costCalculator.calculateTotalCost(for: dayEntries, mode: costMode)
     }
     
     /// Calculate spend for a custom date range with cost mode support
@@ -48,7 +62,7 @@ class SpendCalculator {
         let rangeEntries = entries.filter { entry in
             entry.timestamp >= startDate && entry.timestamp <= endDate
         }
-        return pricingManager.calculateTotalCost(for: rangeEntries, mode: costMode)
+        return costCalculator.calculateTotalCost(for: rangeEntries, mode: costMode)
     }
     
     /// Get spending breakdown by model for given entries with cost mode support
@@ -60,7 +74,7 @@ class SpendCalculator {
             if entry.model == "<synthetic>" {
                 continue
             }
-            let cost = pricingManager.calculateCost(for: entry, mode: costMode)
+            let cost = costCalculator.calculateCost(for: entry, mode: costMode)
             breakdown[entry.model, default: 0.0] += cost
         }
         
