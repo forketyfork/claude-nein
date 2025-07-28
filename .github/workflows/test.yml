@@ -30,6 +30,6 @@ jobs:
         xcodebuild test \
           -project ClaudeNein.xcodeproj \
           -scheme ClaudeNein \
-          -destination 'platform=macOS,arch=x86_64' \
+          -destination 'platform=macOS' \
           -configuration Debug \
           -enableCodeCoverage YES
