@@ -8,6 +8,14 @@ A native macOS menu bar application that monitors your Claude Code spending in r
 
 Claude Nein lives in your macOS menu bar, keeping you constantly updated on your Claude Code API usage costs. It automatically discovers your Claude project log files, parses them efficiently, and presents a clear summary of your spending.
 
+## Installation
+
+1. Visit the [Releases](https://github.com/forketyfork/claude-nein/releases) page and download the `ClaudeNein-<version>-unsigned.zip` asset from the latest release.
+2. Unzip the archive and move `ClaudeNein.app` to your `/Applications` folder.
+3. Reset the quarantine flag on the app: `xattr -d com.apple.quarantine /Applications/ClaudeNein.app`
+4. Right-click the app and choose **Open**
+5. On first run, the app will ask you for access to the Claude directories.
+
 ## Features
 
 - **Real-Time Menu Bar Display** – today's spend appears in the menu bar and animates smoothly when the value changes.
@@ -38,14 +46,6 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 2. Select the **ClaudeNein** scheme.
 3. Build and run the project to launch the menu bar app.
 4. To run the unit tests use `xcodebuild test -scheme ClaudeNein -destination 'platform=macOS'`.
-
-### Prebuilt Unsigned App
-The app is not yet published to the App Store, so the process of installing it is a bit convoluted:
-1. Visit the [Releases](https://github.com/forketyfork/claude-nein/releases) page and download the `ClaudeNein-<version>-unsigned.zip` asset from the latest release.
-2. Unzip the archive and move `ClaudeNein.app` to your `/Applications` folder.
-3. Reset the quarantine flag on the app: `xattr -d com.apple.quarantine /Applications/ClaudeNein.app`
-4. Because the app is unsigned, right-click the app and choose **Open** the first time to bypass Gatekeeper.
-5. On first run, the app will ask you for access to the Claude directories.
 
 ## Technical Details
 
