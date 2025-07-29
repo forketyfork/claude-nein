@@ -115,10 +115,7 @@ final class FileMonitorTests: XCTestCase {
         try await waitForCondition {
             return self.fileMonitor.isMonitoring
         }
-        
-        // Allow FSEvents to fully initialize (FSEvents has internal latency)
-//        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-        
+                
         // Set up file change collection
         var detectedFiles: [URL] = []
         
