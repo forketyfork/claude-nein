@@ -1,8 +1,8 @@
-# Claude Nein - Claude Code Spend Monitor
+# <img src="images/icon.png" width="5%"> Claude Nein - Claude Code Spend Monitor
 
 A native macOS menu bar application that monitors your Claude Code spending in real-time, providing intuitive visual feedback and detailed breakdowns. Inspired by [ccusage](https://github.com/ryoppippi/ccusage/).
 
-<img src="images/ClaudeNein1.png" width="50%"> <img src="images/ClaudeNein2.png" width="50%">
+<img src="images/ClaudeNein1.png" width="40%"> <img src="images/ClaudeNein2.png" width="40%">
 
 ## Overview
 
@@ -13,8 +13,7 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 1. Visit the [Releases](https://github.com/forketyfork/claude-nein/releases) page and download the `ClaudeNein-<version>-unsigned.zip` asset from the latest release.
 2. Unzip the archive and move `ClaudeNein.app` to your `/Applications` folder.
 3. Reset the quarantine flag on the app: `xattr -d com.apple.quarantine /Applications/ClaudeNein.app`
-4. Right-click the app and choose **Open**
-5. On first run, the app will ask you for access to the Claude directories.
+4. Open the app. On first run, the app will ask you for access to the Claude directories.
 
 ## Features
 
