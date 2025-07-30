@@ -71,10 +71,17 @@ struct SpendGraphView: View {
     private var periodSelector: some View {
         switch period {
         case .day:
-            DatePicker("", selection: $selectedDate, displayedComponents: [.date])
-                .datePickerStyle(FieldDatePickerStyle())
-                .labelsHidden()
-                .frame(minWidth: 200)
+            HStack {
+                DatePicker("", selection: $selectedDate, displayedComponents: [.date])
+                    .datePickerStyle(FieldDatePickerStyle())
+                    .labelsHidden()
+                    .frame(minWidth: 150)
+                
+                Button("Today") {
+                    selectedDate = Date()
+                }
+                .disabled(Calendar.current.isDate(selectedDate, inSameDayAs: Date()))
+            }
         case .month:
             HStack(spacing: 4) {
                 Picker("", selection: monthBinding) {
@@ -83,23 +90,25 @@ struct SpendGraphView: View {
                     }
                 }
                 .labelsHidden()
+                .frame(width: 120)
 
                 Picker("", selection: yearBinding) {
                     ForEach(yearRange, id: \.self) { y in
-                        Text("\(y)").tag(y)
+                        Text(String(format: "%d", y)).tag(y)
                     }
                 }
                 .labelsHidden()
+                .frame(width: 80)
             }
             .frame(minWidth: 200)
         case .year:
             Picker("", selection: yearBinding) {
                 ForEach(yearRange, id: \.self) { y in
-                    Text("\(y)").tag(y)
+                    Text(String(format: "%d", y)).tag(y)
                 }
             }
             .labelsHidden()
-            .frame(minWidth: 200)
+            .frame(width: 100)
         }
     }
 
