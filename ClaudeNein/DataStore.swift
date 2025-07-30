@@ -339,6 +339,25 @@ class DataStore {
         return values
     }
 
+    // MARK: - Available Date Ranges
+    
+    /// Get the earliest date with data in the database
+    func getEarliestDataDate() -> Date? {
+        var earliestDate: Date?
+        context.performAndWait {
+            let request: NSFetchRequest<UsageEntryEntity> = UsageEntryEntity.fetchRequest()
+            request.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
+            request.fetchLimit = 1
+            
+            do {
+                earliestDate = try context.fetch(request).first?.timestamp
+            } catch {
+                logger.error("Failed to fetch earliest data date: \(error.localizedDescription)")
+            }
+        }
+        return earliestDate
+    }
+
     // MARK: - Pricing Storage
 
     /// Save fetched pricing data to Core Data

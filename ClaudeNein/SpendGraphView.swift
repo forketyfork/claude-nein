@@ -25,6 +25,145 @@ struct SpendGraphView: View {
     @State private var period: GraphPeriod = .day
     @State private var dataPoints: [DataPoint] = []
     @State private var selectedDate: Date = Date()
+    @State private var earliestDataDate: Date?
+
+    private var monthBinding: Binding<Int> {
+        Binding<Int>(
+            get: { 
+                let currentMonth = Calendar.current.component(.month, from: selectedDate)
+                // Ensure the current month is within the available range
+                let availableMonths = monthRange
+                if availableMonths.contains(currentMonth) {
+                    return currentMonth
+                } else {
+                    // Return the first available month if current is not available
+                    return availableMonths.first ?? currentMonth
+                }
+            },
+            set: { newMonth in
+                var comps = Calendar.current.dateComponents([.year], from: selectedDate)
+                comps.month = newMonth
+                comps.day = 1
+                if let newDate = Calendar.current.date(from: comps) {
+                    selectedDate = newDate
+                }
+            }
+        )
+    }
+
+    private var yearBinding: Binding<Int> {
+        Binding<Int>(
+            get: { Calendar.current.component(.year, from: selectedDate) },
+            set: { newYear in
+                var comps = Calendar.current.dateComponents([.month], from: selectedDate)
+                comps.year = newYear
+                if period == .year {
+                    comps.month = 1
+                    comps.day = 1
+                } else if period == .month {
+                    comps.day = 1
+                }
+                if let newDate = Calendar.current.date(from: comps) {
+                    selectedDate = newDate
+                }
+            }
+        )
+    }
+
+    private var yearRange: [Int] {
+        let calendar = Calendar.current
+        let current = calendar.component(.year, from: Date())
+        
+        let earliest: Int
+        if let earliestDataDate = earliestDataDate {
+            earliest = calendar.component(.year, from: earliestDataDate)
+        } else {
+            earliest = current
+        }
+        
+        return Array(earliest...current)
+    }
+    
+    private var monthRange: [Int] {
+        guard let earliestDataDate = earliestDataDate else {
+            return Array(1...12)
+        }
+        
+        let calendar = Calendar.current
+        let selectedYear = calendar.component(.year, from: selectedDate)
+        let earliestYear = calendar.component(.year, from: earliestDataDate)
+        let currentYear = calendar.component(.year, from: Date())
+        let currentMonth = calendar.component(.month, from: Date())
+        let earliestMonth = calendar.component(.month, from: earliestDataDate)
+        
+        let startMonth: Int
+        let endMonth: Int
+        
+        if selectedYear == earliestYear {
+            startMonth = earliestMonth
+        } else {
+            startMonth = 1
+        }
+        
+        if selectedYear == currentYear {
+            endMonth = currentMonth
+        } else {
+            endMonth = 12
+        }
+        
+        return Array(startMonth...endMonth)
+    }
+    
+    private var dateRange: ClosedRange<Date> {
+        let latest = Date()
+        let earliest = earliestDataDate ?? latest
+        return earliest...latest
+    }
+
+    @ViewBuilder
+    private var periodSelector: some View {
+        switch period {
+        case .day:
+            HStack {
+                DatePicker("", selection: $selectedDate, in: dateRange, displayedComponents: [.date])
+                    .datePickerStyle(FieldDatePickerStyle())
+                    .labelsHidden()
+                    .frame(minWidth: 150)
+                
+                Button("Today") {
+                    selectedDate = Date()
+                }
+                .disabled(Calendar.current.isDate(selectedDate, inSameDayAs: Date()))
+            }
+        case .month:
+            HStack(spacing: 4) {
+                Picker("", selection: monthBinding) {
+                    ForEach(monthRange, id: \.self) { m in
+                        Text(Calendar.current.monthSymbols[m-1]).tag(m)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 120)
+
+                Picker("", selection: yearBinding) {
+                    ForEach(yearRange, id: \.self) { y in
+                        Text(String(format: "%d", y)).tag(y)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 80)
+            }
+            .frame(minWidth: 200)
+        case .year:
+            Picker("", selection: yearBinding) {
+                ForEach(yearRange, id: \.self) { y in
+                    Text(String(format: "%d", y)).tag(y)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 100)
+        }
+    }
 
     private let dataStore = DataStore.shared
 
@@ -51,12 +190,9 @@ struct SpendGraphView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .frame(width: 44, height: 44)
-                    
-                    Text(currentPeriodText)
-                        .font(.headline)
-                        .fontWeight(.medium)
-                        .frame(minWidth: 200, alignment: .center)
-                    
+
+                    periodSelector
+                        
                     Button(action: goToNext) {
                         Image(systemName: "chevron.right")
                             .foregroundColor(.accentColor)
@@ -90,7 +226,11 @@ struct SpendGraphView: View {
             .padding([.leading, .trailing, .bottom])
         }
         .frame(minWidth: 900, minHeight: 700)
-        .onAppear(perform: loadData)
+        .onAppear {
+            loadEarliestDate()
+            loadData()
+            setupDatabaseObserver()
+        }
         .onChange(of: period) { _ in 
             selectedDate = Date()
             loadData() 
@@ -98,6 +238,20 @@ struct SpendGraphView: View {
         .onChange(of: selectedDate) { _ in loadData() }
     }
 
+    private func loadEarliestDate() {
+        earliestDataDate = dataStore.getEarliestDataDate()
+    }
+    
+    private func setupDatabaseObserver() {
+        NotificationCenter.default.addObserver(
+            forName: .NSManagedObjectContextDidSave,
+            object: dataStore.context,
+            queue: .main
+        ) { _ in
+            loadEarliestDate()
+        }
+    }
+    
     private func loadData() {
         let rawValues: [Double]
         let calendar = Calendar.current
@@ -155,20 +309,6 @@ struct SpendGraphView: View {
         }
     }
     
-    private var currentPeriodText: String {
-        let formatter = DateFormatter()
-        switch period {
-        case .day:
-            formatter.dateFormat = "EEEE, MMM d, yyyy"
-            return formatter.string(from: selectedDate)
-        case .month:
-            formatter.dateFormat = "MMMM yyyy"
-            return formatter.string(from: selectedDate)
-        case .year:
-            formatter.dateFormat = "yyyy"
-            return formatter.string(from: selectedDate)
-        }
-    }
     
     private var isNextDisabled: Bool {
         let calendar = Calendar.current
