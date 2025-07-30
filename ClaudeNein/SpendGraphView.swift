@@ -26,6 +26,83 @@ struct SpendGraphView: View {
     @State private var dataPoints: [DataPoint] = []
     @State private var selectedDate: Date = Date()
 
+    private var monthBinding: Binding<Int> {
+        Binding<Int>(
+            get: { Calendar.current.component(.month, from: selectedDate) },
+            set: { newMonth in
+                var comps = Calendar.current.dateComponents([.year], from: selectedDate)
+                comps.month = newMonth
+                comps.day = 1
+                if let newDate = Calendar.current.date(from: comps) {
+                    selectedDate = newDate
+                }
+            }
+        )
+    }
+
+    private var yearBinding: Binding<Int> {
+        Binding<Int>(
+            get: { Calendar.current.component(.year, from: selectedDate) },
+            set: { newYear in
+                var comps = Calendar.current.dateComponents([.month], from: selectedDate)
+                comps.year = newYear
+                if period == .year {
+                    comps.month = 1
+                    comps.day = 1
+                } else if period == .month {
+                    comps.day = 1
+                }
+                if let newDate = Calendar.current.date(from: comps) {
+                    selectedDate = newDate
+                }
+            }
+        )
+    }
+
+    private var yearRange: [Int] {
+        let calendar = Calendar.current
+        let current = calendar.component(.year, from: Date())
+        let selected = calendar.component(.year, from: selectedDate)
+        let start = min(current, selected) - 5
+        return Array(start...current)
+    }
+
+    @ViewBuilder
+    private var periodSelector: some View {
+        switch period {
+        case .day:
+            DatePicker("", selection: $selectedDate, displayedComponents: [.date])
+                .datePickerStyle(FieldDatePickerStyle())
+                .labelsHidden()
+                .frame(minWidth: 200)
+        case .month:
+            HStack(spacing: 4) {
+                Picker("", selection: monthBinding) {
+                    ForEach(1...12, id: \.self) { m in
+                        Text(Calendar.current.monthSymbols[m-1]).tag(m)
+                    }
+                }
+                .labelsHidden()
+
+                Picker("", selection: yearBinding) {
+                    ForEach(yearRange, id: \.self) { y in
+                        Text("\(y)").tag(y)
+                    }
+                }
+                .labelsHidden()
+            }
+            .frame(minWidth: 200)
+        case .year:
+            Picker("", selection: yearBinding) {
+                ForEach(yearRange, id: \.self) { y in
+                    Text("\(y)").tag(y)
+                }
+            }
+            .labelsHidden()
+            .frame(minWidth: 200)
+        }
+    }
+
     private let dataStore = DataStore.shared
 
     var body: some View {
@@ -51,12 +128,9 @@ struct SpendGraphView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .frame(width: 44, height: 44)
-                    
-                    Text(currentPeriodText)
-                        .font(.headline)
-                        .fontWeight(.medium)
-                        .frame(minWidth: 200, alignment: .center)
-                    
+
+                    periodSelector
+                        
                     Button(action: goToNext) {
                         Image(systemName: "chevron.right")
                             .foregroundColor(.accentColor)
@@ -155,20 +229,6 @@ struct SpendGraphView: View {
         }
     }
     
-    private var currentPeriodText: String {
-        let formatter = DateFormatter()
-        switch period {
-        case .day:
-            formatter.dateFormat = "EEEE, MMM d, yyyy"
-            return formatter.string(from: selectedDate)
-        case .month:
-            formatter.dateFormat = "MMMM yyyy"
-            return formatter.string(from: selectedDate)
-        case .year:
-            formatter.dateFormat = "yyyy"
-            return formatter.string(from: selectedDate)
-        }
-    }
     
     private var isNextDisabled: Bool {
         let calendar = Calendar.current
