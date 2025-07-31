@@ -1,7 +1,7 @@
 {
   "configurations" : [
     {
-      "id" : "179CA31F-53F5-4479-B64D-27660C95592D",
+      "id" : "1E417238-B750-4514-B990-0D78E8BC10A4",
       "name" : "Test Scheme Action",
       "options" : {
 
@@ -17,7 +17,7 @@
   },
   "testTargets" : [
     {
-      "parallelizable" : true,
+      "parallelizable" : false,
       "target" : {
         "containerPath" : "container:ClaudeNein.xcodeproj",
         "identifier" : "1044BE582E2E6A9200CF5877",
