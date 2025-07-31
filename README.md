@@ -1,5 +1,8 @@
 # <img src="images/icon.png" width="5%"> Claude Nein - Claude Code Spend Monitor
 
+[![Build status](https://github.com/forketyfork/claude-nein/actions/workflows/test.yml/badge.svg)](https://github.com/forketyfork/claude-nein/actions/workflows/test.yml)
+[![Latest Release](https://img.shields.io/github/v/release/forketyfork/claude-nein)](https://github.com/forketyfork/claude-nein/releases/latest)
+
 A native macOS menu bar application that monitors your Claude Code spending in real-time, providing intuitive visual feedback and detailed breakdowns. Inspired by [ccusage](https://github.com/ryoppippi/ccusage/).
 
 <img src="images/ClaudeNein1.png" width="40%"> <img src="images/ClaudeNein2.png" width="40%">
