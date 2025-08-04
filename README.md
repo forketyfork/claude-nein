@@ -29,7 +29,7 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 - **Persistent Data Storage** – usage is cached locally in Core Data so data survives restarts.
 - **Run at Startup Option** – enable automatic launch when you log in.
 - **Database Management** – built in "Reload Database" command clears and reloads cached usage.
-- **Spend Graphs** – interactive graph view showing spending trends by day, month, or year with navigation controls.
+- **Spend Graphs** – interactive graph view showing spending trends by day, month, or year with navigation controls and switchable plot types (bar and cumulative).
 - **Secure & Private** – all processing happens on your Mac; the only network request fetches pricing information.
 - **Claude Directory Access Control** – you explicitly grant and revoke access only to the Claude log directories.
 - **Up‑to‑Date Pricing** – pricing data is pulled from LiteLLM with cached and bundled fallbacks, and the current data source is displayed in the menu.
@@ -62,6 +62,8 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
     - `DataStore` for Core Data persistence and spend calculations
     - `PricingManager` for fetching and caching model pricing data
     - `HomeDirectoryAccessManager` for handling secure file access permissions
+    - `GraphRenderer` for modular graph rendering with multiple plot types
+    - `SpendGraphView` for interactive spending visualization
 
 ### Data Source
 
@@ -89,6 +91,8 @@ ClaudeNein/
 ├── LiteLLMParser.swift              # Parses pricing data from LiteLLM source
 ├── LaunchAtLoginManager.swift       # Manages launch at login functionality
 ├── SpendGraphView.swift             # SwiftUI view for spending graphs
+├── GraphRenderer.swift              # Modular graph rendering system
+├── AboutView.swift                  # About dialog with app information
 ├── Logger.swift                     # Centralized logging system
 └── Assets.xcassets/                 # App icons and assets
 ```
