@@ -28,7 +28,8 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            MARKETING_VERSION="$VERSION"
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="${{ github.run_id }}"
       - name: Package app
         run: |
           mkdir -p dist
