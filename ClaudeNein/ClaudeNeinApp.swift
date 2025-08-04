@@ -25,6 +25,7 @@ class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
 
     private var graphWindow: NSWindow?
+    private var aboutWindow: NSWindow?
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -243,6 +244,10 @@ class MenuBarManager: ObservableObject {
         
         menu.addItem(NSMenuItem.separator())
         
+        let aboutItem = NSMenuItem(title: "About ClaudeNein", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+        
         let quitItem = NSMenuItem(title: "Quit ClaudeNein", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -325,6 +330,20 @@ class MenuBarManager: ObservableObject {
             graphWindow?.setContentSize(NSSize(width: 400, height: 300))
         }
         graphWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func showAbout() {
+        if aboutWindow == nil {
+            let view = AboutView()
+            let hosting = NSHostingController(rootView: view)
+            aboutWindow = NSWindow(contentViewController: hosting)
+            aboutWindow?.title = "About ClaudeNein"
+            aboutWindow?.styleMask = [.titled, .closable]
+            aboutWindow?.setContentSize(NSSize(width: 400, height: 350))
+            aboutWindow?.center()
+        }
+        aboutWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
