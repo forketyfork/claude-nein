@@ -198,6 +198,7 @@ struct SpendGraphView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .disabled(isPreviousDisabled)
                     .frame(width: 44, height: 44)
 
                     periodSelector
@@ -332,6 +333,29 @@ struct SpendGraphView: View {
             let selectedYear = calendar.component(.year, from: selectedDate)
             let currentYear = calendar.component(.year, from: now)
             return selectedYear >= currentYear
+        }
+    }
+    
+    private var isPreviousDisabled: Bool {
+        guard let earliestDataDate = earliestDataDate else {
+            return false
+        }
+        
+        let calendar = Calendar.current
+        
+        switch period {
+        case .day:
+            return calendar.isDate(selectedDate, inSameDayAs: earliestDataDate) || selectedDate < earliestDataDate
+        case .month:
+            let selectedMonth = calendar.component(.month, from: selectedDate)
+            let selectedYear = calendar.component(.year, from: selectedDate)
+            let earliestMonth = calendar.component(.month, from: earliestDataDate)
+            let earliestYear = calendar.component(.year, from: earliestDataDate)
+            return (selectedYear == earliestYear && selectedMonth <= earliestMonth) || selectedYear < earliestYear
+        case .year:
+            let selectedYear = calendar.component(.year, from: selectedDate)
+            let earliestYear = calendar.component(.year, from: earliestDataDate)
+            return selectedYear <= earliestYear
         }
     }
     
