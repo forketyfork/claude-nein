@@ -7,10 +7,30 @@ struct DataPoint {
     let label: String
 }
 
-/// Protocol defining a graph renderer implementation
-protocol GraphRenderer: Identifiable where ID == String {
+/// Enum defining a graph renderer implementation
+enum GraphRendererType: String, Identifiable, CaseIterable {
+    case cumulative
+    case bar
+    
+    var id: String { rawValue }
+    
     /// Display name used in the UI picker
-    var displayName: String { get }
+    var displayName: String {
+        switch self {
+        case .cumulative: "Cumulative"
+        case .bar: "Bar"
+        }
+    }
+    
+    var renderer: any GraphRenderer {
+        switch self {
+        case .cumulative: CumulativeGraphRenderer()
+        case .bar: BarGraphRenderer()
+        }
+    }
+}
+
+protocol GraphRenderer {
     /// Caption shown above the graph
     var caption: String { get }
     /// Transform raw values into data points for drawing
@@ -21,8 +41,6 @@ protocol GraphRenderer: Identifiable where ID == String {
 
 /// Renders a cumulative line graph
 final class CumulativeGraphRenderer: GraphRenderer {
-    let id = "cumulative"
-    let displayName = "Cumulative"
     let caption = "Cumulative Spend"
 
     func transform(rawValues: [Double], labelFor: (Int) -> String) -> [DataPoint] {
@@ -77,8 +95,6 @@ final class CumulativeGraphRenderer: GraphRenderer {
 
 /// Renders a bar graph
 final class BarGraphRenderer: GraphRenderer {
-    let id = "bar"
-    let displayName = "Bar"
     let caption = "Spend"
 
     func transform(rawValues: [Double], labelFor: (Int) -> String) -> [DataPoint] {

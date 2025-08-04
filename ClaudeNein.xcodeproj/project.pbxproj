@@ -22,9 +22,22 @@
 		10597F4D2E301B40009E7728 /* ClaudeNein.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = ClaudeNein.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		10260CC62E409BCF00AAEEB9 /* Exceptions for "ClaudeNein" folder in "ClaudeNein" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1044BE4A2E2E6A9100CF5877 /* ClaudeNein */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1044BE4D2E2E6A9100CF5877 /* ClaudeNein */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				10260CC62E409BCF00AAEEB9 /* Exceptions for "ClaudeNein" folder in "ClaudeNein" target */,
+			);
 			path = ClaudeNein;
 			sourceTree = "<group>";
 		};

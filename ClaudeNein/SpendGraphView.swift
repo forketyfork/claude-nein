@@ -20,16 +20,7 @@ struct SpendGraphView: View {
     @State private var dataPoints: [DataPoint] = []
     @State private var selectedDate: Date = Date()
     @State private var earliestDataDate: Date?
-    @State private var selectedGraphID: String = CumulativeGraphRenderer().id
-
-    private let graphRenderers: [any GraphRenderer] = [
-        CumulativeGraphRenderer(),
-        BarGraphRenderer()
-    ]
-
-    private var currentRenderer: any GraphRenderer {
-        graphRenderers.first { $0.id == selectedGraphID } ?? graphRenderers[0]
-    }
+    @State private var selectedRendererType: GraphRendererType = GraphRendererType.bar
 
     private var monthBinding: Binding<Int> {
         Binding<Int>(
@@ -173,16 +164,30 @@ struct SpendGraphView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Period", selection: $period) {
-                ForEach(GraphPeriod.allCases) { p in
-                    Text(p.rawValue).tag(p)
+            HStack {
+                Picker("Period", selection: $period) {
+                    ForEach(GraphPeriod.allCases) { p in
+                        Text(p.rawValue).tag(p)
+                    }
                 }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding()
+
+                Spacer()
+
+                Picker("Graph Type", selection: $selectedRendererType) {
+                    ForEach(GraphRendererType.allCases) { type in
+                        Text(type.displayName).tag(type)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .frame(width: 200)
+                .padding()
+
             }
-            .pickerStyle(SegmentedPickerStyle())
-            .padding()
-            
             // Navigation controls
             HStack {
+
                 Spacer()
                 
                 HStack(spacing: 16) {
@@ -196,14 +201,6 @@ struct SpendGraphView: View {
                     .frame(width: 44, height: 44)
 
                     periodSelector
-
-                    Picker("Graph Type", selection: $selectedGraphID) {
-                        ForEach(graphRenderers) { renderer in
-                            Text(renderer.displayName).tag(renderer.id)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .frame(width: 200)
 
                     Button(action: goToNext) {
                         Image(systemName: "chevron.right")
@@ -221,7 +218,7 @@ struct SpendGraphView: View {
             .padding(.horizontal)
             
             VStack(alignment: .leading) {
-                Text(currentRenderer.caption)
+                Text(selectedRendererType.renderer.caption)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.leading, 70)
@@ -231,7 +228,7 @@ struct SpendGraphView: View {
                         drawGrid(in: geo.size)
                         drawYAxisLabels(in: geo.size)
                         drawXAxisLabels(in: geo.size)
-                        currentRenderer.drawGraph(in: geo.size, dataPoints: dataPoints)
+                        selectedRendererType.renderer.drawGraph(in: geo.size, dataPoints: dataPoints)
                     }
                 }
             }
@@ -243,12 +240,12 @@ struct SpendGraphView: View {
             loadData()
             setupDatabaseObserver()
         }
-        .onChange(of: period) { _ in
+        .onChange(of: period) { _, _ in
             selectedDate = Date()
             loadData()
         }
-        .onChange(of: selectedGraphID) { _ in loadData() }
-        .onChange(of: selectedDate) { _ in loadData() }
+        .onChange(of: selectedRendererType) { _, _ in loadData() }
+        .onChange(of: selectedDate) { _, _ in loadData() }
     }
 
     private func loadEarliestDate() {
@@ -268,6 +265,7 @@ struct SpendGraphView: View {
     private func loadData() {
         let rawValues: [Double]
         let calendar = Calendar.current
+        let renderer = selectedRendererType.renderer
         
         switch period {
         case .day:
@@ -299,7 +297,7 @@ struct SpendGraphView: View {
         // Only show data up to current time (for current period) or all data (for past periods)
         let limitedValues = Array(rawValues.prefix(currentTimeIndex + 1))
 
-        dataPoints = currentRenderer.transform(
+        dataPoints = renderer.transform(
             rawValues: limitedValues,
             labelFor: timeLabel(for:)
         )
