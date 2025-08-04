@@ -217,6 +217,8 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [ ] Notifications for spending thresholds
 - [x] Historical spending graphs and trends (SpendGraphView implemented)
 - [x] Dropdown selectors for date/month/year in spend graph
+- [x] Toggle between bar and cumulative plots in spend graph
+- [x] Modular graph renderer architecture for additional plot types
 - [ ] Export spending data to CSV/JSON
 - [ ] Integration with expense tracking apps
 - [ ] Customizable spending alerts and limits

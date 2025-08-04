@@ -144,19 +144,18 @@ class DataStore {
                 self.logger.error("Failed to upsert entries: \(error.localizedDescription)")
                 
                 // Log detailed validation errors
-                if let validationError = error as? NSError {
-                    self.logger.error("Error code: \(validationError.code)")
-                    self.logger.error("Error domain: \(validationError.domain)")
-                    
-                    if let detailedErrors = validationError.userInfo[NSDetailedErrorsKey] as? [NSError] {
-                        for detailError in detailedErrors {
-                            self.logger.error("Validation error: \(detailError.localizedDescription)")
-                            if let object = detailError.userInfo[NSValidationObjectErrorKey] as? NSManagedObject {
-                                self.logger.error("Failed object: \(object)")
-                            }
-                            if let key = detailError.userInfo[NSValidationKeyErrorKey] as? String {
-                                self.logger.error("Failed property: \(key)")
-                            }
+                let validationError = error as NSError
+                self.logger.error("Error code: \(validationError.code)")
+                self.logger.error("Error domain: \(validationError.domain)")
+                
+                if let detailedErrors = validationError.userInfo[NSDetailedErrorsKey] as? [NSError] {
+                    for detailError in detailedErrors {
+                        self.logger.error("Validation error: \(detailError.localizedDescription)")
+                        if let object = detailError.userInfo[NSValidationObjectErrorKey] as? NSManagedObject {
+                            self.logger.error("Failed object: \(object)")
+                        }
+                        if let key = detailError.userInfo[NSValidationKeyErrorKey] as? String {
+                            self.logger.error("Failed property: \(key)")
                         }
                     }
                 }
