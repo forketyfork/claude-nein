@@ -15,17 +15,21 @@ enum GraphPeriod: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-struct DataPoint {
-    let x: Int
-    let y: Double
-    let label: String
-}
-
 struct SpendGraphView: View {
     @State private var period: GraphPeriod = .day
     @State private var dataPoints: [DataPoint] = []
     @State private var selectedDate: Date = Date()
     @State private var earliestDataDate: Date?
+    @State private var selectedGraphID: String = CumulativeGraphRenderer().id
+
+    private let graphRenderers: [any GraphRenderer] = [
+        CumulativeGraphRenderer(),
+        BarGraphRenderer()
+    ]
+
+    private var currentRenderer: any GraphRenderer {
+        graphRenderers.first { $0.id == selectedGraphID } ?? graphRenderers[0]
+    }
 
     private var monthBinding: Binding<Int> {
         Binding<Int>(
@@ -192,7 +196,15 @@ struct SpendGraphView: View {
                     .frame(width: 44, height: 44)
 
                     periodSelector
-                        
+
+                    Picker("Graph Type", selection: $selectedGraphID) {
+                        ForEach(graphRenderers) { renderer in
+                            Text(renderer.displayName).tag(renderer.id)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .frame(width: 200)
+
                     Button(action: goToNext) {
                         Image(systemName: "chevron.right")
                             .foregroundColor(.accentColor)
@@ -209,17 +221,17 @@ struct SpendGraphView: View {
             .padding(.horizontal)
             
             VStack(alignment: .leading) {
-                Text("Cumulative Spend")
+                Text(currentRenderer.caption)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.leading, 70)
-                
+
                 GeometryReader { geo in
                     ZStack(alignment: .bottomLeading) {
                         drawGrid(in: geo.size)
                         drawYAxisLabels(in: geo.size)
                         drawXAxisLabels(in: geo.size)
-                        drawLineGraph(in: geo.size)
+                        currentRenderer.drawGraph(in: geo.size, dataPoints: dataPoints)
                     }
                 }
             }
@@ -231,10 +243,11 @@ struct SpendGraphView: View {
             loadData()
             setupDatabaseObserver()
         }
-        .onChange(of: period) { _ in 
+        .onChange(of: period) { _ in
             selectedDate = Date()
-            loadData() 
+            loadData()
         }
+        .onChange(of: selectedGraphID) { _ in loadData() }
         .onChange(of: selectedDate) { _ in loadData() }
     }
 
@@ -285,17 +298,11 @@ struct SpendGraphView: View {
         
         // Only show data up to current time (for current period) or all data (for past periods)
         let limitedValues = Array(rawValues.prefix(currentTimeIndex + 1))
-        
-        // Convert to cumulative values and create data points with labels
-        var cumulative = 0.0
-        dataPoints = limitedValues.enumerated().map { index, value in
-            cumulative += value
-            return DataPoint(
-                x: index,
-                y: cumulative,
-                label: timeLabel(for: index)
-            )
-        }
+
+        dataPoints = currentRenderer.transform(
+            rawValues: limitedValues,
+            labelFor: timeLabel(for:)
+        )
     }
     
     private var periodGranularity: Calendar.Component {
@@ -442,49 +449,6 @@ struct SpendGraphView: View {
         return index % step == 0 || index == total - 1
     }
 
-    @ViewBuilder
-    private func drawLineGraph(in size: CGSize) -> some View {
-        let graphArea = CGRect(x: 60, y: 10, width: size.width - 90, height: size.height - 60)
-        
-        if !dataPoints.isEmpty {
-        
-        if dataPoints.count > 1 {
-            let maxValue = max(dataPoints.map(\.y).max() ?? 1.0, 0.01)
-            
-            // Line path
-            Path { path in
-                for (index, point) in dataPoints.enumerated() {
-                    let x = graphArea.minX + CGFloat(point.x) * graphArea.width / CGFloat(max(dataPoints.count - 1, 1))
-                    let normalizedY = point.y.isFinite ? point.y / maxValue : 0.0
-                    let y = graphArea.maxY - (CGFloat(normalizedY) * graphArea.height)
-                    
-                    if x.isFinite && y.isFinite {
-                        if index == 0 {
-                            path.move(to: CGPoint(x: x, y: y))
-                        } else {
-                            path.addLine(to: CGPoint(x: x, y: y))
-                        }
-                    }
-                }
-            }
-            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-            
-            // Data points
-            ForEach(Array(dataPoints.enumerated()), id: \.offset) { index, point in
-                let x = graphArea.minX + CGFloat(point.x) * graphArea.width / CGFloat(max(dataPoints.count - 1, 1))
-                let normalizedY = point.y.isFinite ? point.y / maxValue : 0.0
-                let y = graphArea.maxY - (CGFloat(normalizedY) * graphArea.height)
-                
-                if x.isFinite && y.isFinite {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 4, height: 4)
-                        .position(x: x, y: y)
-                }
-            }
-        }
-        }
-    }
 }
 
 #if DEBUG
