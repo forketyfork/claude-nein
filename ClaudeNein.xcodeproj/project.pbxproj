@@ -30,6 +30,13 @@
 			);
 			target = 1044BE4A2E2E6A9100CF5877 /* ClaudeNein */;
 		};
+		10260CC72E409BCF00AAEEB9 /* Exceptions for "ClaudeNein" folder in "ClaudeNeinTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1044BE582E2E6A9200CF5877 /* ClaudeNeinTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -37,6 +44,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				10260CC62E409BCF00AAEEB9 /* Exceptions for "ClaudeNein" folder in "ClaudeNein" target */,
+				10260CC72E409BCF00AAEEB9 /* Exceptions for "ClaudeNein" folder in "ClaudeNeinTests" target */,
 			);
 			path = ClaudeNein;
 			sourceTree = "<group>";

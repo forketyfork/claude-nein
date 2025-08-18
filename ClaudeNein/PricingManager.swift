@@ -1,18 +1,109 @@
 import Foundation
 import OSLog
 
+extension Notification.Name {
+    static let pricingDataUpdated = Notification.Name("pricingDataUpdated")
+}
+
+/// Actor that coordinates fetching of unknown model pricing data
+actor UnknownModelFetchCoordinator {
+    private var pendingUnknownModels = Set<String>()
+    private var activeFetchTask: Task<ModelPricing?, Never>?
+    private var lastFetchAttempt: Date = .distantPast
+    private let fastRefreshInterval: TimeInterval = 60 // 1 minute for unknown models
+    
+    /// Add an unknown model and get pricing if/when available
+    func requestPricingForUnknownModel(_ modelName: String, fetcher: @escaping () async throws -> ModelPricing) async -> ModelPricing? {
+        // Add to pending set
+        pendingUnknownModels.insert(modelName)
+        
+        // Check if we should trigger a new fetch
+        let now = Date()
+        let timeSinceLastFetch = now.timeIntervalSince(lastFetchAttempt)
+        
+        // If there's no active fetch and cooldown has passed, start a new fetch
+        if activeFetchTask == nil && timeSinceLastFetch >= fastRefreshInterval {
+            lastFetchAttempt = now
+            
+            // Create a new fetch task that all waiters can share
+            let fetchTask = Task<ModelPricing?, Never> {
+                do {
+                    let pricing = try await fetcher()
+                    
+                    // Check which models were resolved
+                    let resolvedModels = pendingUnknownModels.intersection(Set(pricing.models.keys))
+                    
+                    // Remove resolved models from pending
+                    pendingUnknownModels.subtract(resolvedModels)
+                    
+                    if !resolvedModels.isEmpty {
+                        Logger.calculator.info("✅ Resolved pricing for \(resolvedModels.count) unknown model(s)")
+                    }
+                    
+                    return pricing
+                } catch {
+                    Logger.calculator.warning("⚠️ Failed to fetch pricing for unknown models: \(error.localizedDescription)")
+                    return nil
+                }
+            }
+            
+            activeFetchTask = fetchTask
+            
+            // Clean up the task reference when done
+            Task {
+                _ = await fetchTask.value
+                self.activeFetchTask = nil
+            }
+        }
+        
+        // Wait for the active fetch task if there is one
+        if let fetchTask = activeFetchTask {
+            return await fetchTask.value
+        }
+        
+        // No fetch available or in cooldown
+        return nil
+    }
+    
+    /// Check if we have pending unknown models that need pricing
+    func hasPendingModels() -> Bool {
+        return !pendingUnknownModels.isEmpty
+    }
+    
+    /// Get the time until next fetch is allowed
+    func timeUntilNextFetch() -> TimeInterval {
+        let timeSinceLastFetch = Date().timeIntervalSince(lastFetchAttempt)
+        return max(0, fastRefreshInterval - timeSinceLastFetch)
+    }
+    
+    /// Clear a model from pending if it was resolved externally
+    func markModelResolved(_ modelName: String) {
+        pendingUnknownModels.remove(modelName)
+    }
+}
+
 /// Manages pricing data for Claude models and calculates costs
-class PricingManager {
+/// 
+/// This class is marked as `@unchecked Sendable` because:
+/// - It's a singleton with controlled access through `shared`
+/// - All mutable state is protected by appropriate synchronization:
+///   - `cachedPricing`, `dataSource`, `lastFetchDate` are only modified through synchronized methods
+///   - `unknownModelCoordinator` is an actor with built-in thread safety
+///   - Timer operations are properly synchronized with weak self captures
+/// - UserDefaults and DataStore have their own thread-safety mechanisms
+final class PricingManager: @unchecked Sendable {
     static let shared = PricingManager()
 
     private let userDefaults = UserDefaults.standard
     private let pricingCacheKey = "cached_pricing_data"
     private let pricingCacheTimeKey = "cached_pricing_time"
     private let cacheExpirationHours: Double = 4
-    private let refreshIntervalHours: Double = 4
+    private let normalRefreshIntervalHours: Double = 4
+    private let fastRefreshIntervalSeconds: Double = 60
     private var refreshTimer: Timer?
     private let dataStore = DataStore.shared
     private let parser = LiteLLMParser()
+    private let unknownModelCoordinator = UnknownModelFetchCoordinator()
     
     private var cachedPricing: ModelPricing?
     private var isInitialFetchComplete = false
@@ -109,8 +200,33 @@ class PricingManager {
     private func calculateCostFromTokens(for entry: UsageEntry) -> Double {
         let pricing = getCurrentPricing()
         guard let modelPricing = pricing.models[entry.model] else {
-            // Unknown model, use a default rate or return 0
+            // Unknown model, coordinate fetching through the actor
             Logger.calculator.notice("⚠️ Unknown model pricing for: \(entry.model)")
+            
+            Task {
+                // Request pricing through the coordinator
+                let fetchedPricing = await unknownModelCoordinator.requestPricingForUnknownModel(entry.model) { [weak self] in
+                    guard let self = self else { throw PricingError.noPricingData }
+                    return try await self.fetchPricingFromAPI()
+                }
+                
+                if let fetchedPricing = fetchedPricing {
+                    // Cache the new pricing
+                    self.cachePricing(fetchedPricing)
+                    self.dataStore.saveModelPricing(fetchedPricing)
+                    self.dataSource = .api
+                    
+                    // If we found the model, recalculate costs
+                    if fetchedPricing.models[entry.model] != nil {
+                        await self.recalculateCostsForModel(entry.model)
+                        await self.unknownModelCoordinator.markModelResolved(entry.model)
+                    }
+                    
+                    // Check if we need to schedule fast refresh
+                    await self.scheduleRefreshIfNeeded()
+                }
+            }
+            
             return 0.0
         }
         
@@ -239,10 +355,34 @@ class PricingManager {
     }
 
     private func startRefreshTimer() {
+        Task {
+            await scheduleRefreshIfNeeded()
+        }
+    }
+    
+    /// Schedule refresh based on whether we have pending unknown models
+    private func scheduleRefreshIfNeeded() async {
         refreshTimer?.invalidate()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshIntervalHours * 3600, repeats: true) { [weak self] _ in
-            Task {
-                await self?.refreshPricing()
+        
+        let hasPending = await unknownModelCoordinator.hasPendingModels()
+        let interval: TimeInterval
+        
+        if hasPending {
+            // Fast refresh mode for unknown models
+            let timeUntilNext = await unknownModelCoordinator.timeUntilNextFetch()
+            interval = max(timeUntilNext, 1.0) // At least 1 second
+            Logger.calculator.info("⚡ Scheduling fast refresh in \(Int(interval)) seconds for unknown models")
+        } else {
+            // Normal refresh mode
+            interval = normalRefreshIntervalHours * 3600
+            Logger.calculator.info("⏰ Scheduling normal refresh in \(self.normalRefreshIntervalHours) hours")
+        }
+        
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                await self.refreshPricing()
+                await self.scheduleRefreshIfNeeded()
             }
         }
     }
@@ -259,9 +399,44 @@ class PricingManager {
             dataStore.saveModelPricing(pricing)
             dataSource = .api
             Logger.calculator.info("✅ Refreshed pricing data from API")
+            
+            // Notify the UI to refresh
+            NotificationCenter.default.post(name: .pricingDataUpdated, object: nil)
         } catch {
             Logger.calculator.warning("⚠️ Scheduled pricing fetch failed: \(error.localizedDescription)")
         }
+    }
+    
+    
+    /// Recalculate costs for all entries with a specific model using efficient batch processing
+    private func recalculateCostsForModel(_ modelName: String) async {
+        Logger.calculator.info("💰 Recalculating costs for model: \(modelName)")
+        
+        // Process entries in batches using the cursor approach
+        await dataStore.processEntriesForModel(modelName, batchSize: 100) { [weak self] entries in
+            guard let self = self else { return entries }
+            
+            // Recalculate costs for this batch
+            return entries.map { entry in
+                let newCost = self.calculateCostFromTokens(for: entry)
+                return UsageEntry(
+                    id: entry.id,
+                    timestamp: entry.timestamp,
+                    model: entry.model,
+                    tokenCounts: entry.tokenCounts,
+                    cost: newCost,
+                    sessionId: entry.sessionId,
+                    projectPath: entry.projectPath,
+                    requestId: entry.requestId,
+                    originalMessageId: entry.originalMessageId
+                )
+            }
+        }
+        
+        Logger.calculator.info("✅ Completed batch processing for model \(modelName)")
+        
+        // Notify the UI to refresh after all batches are processed
+        NotificationCenter.default.post(name: .pricingDataUpdated, object: nil)
     }
 }
 

@@ -213,6 +213,86 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [ ] Minimal performance impact on system
 - [x] Native macOS look and feel
 
+## Next Steps: Improvements Based on Feature Parity Analysis
+
+### High Priority Enhancements (Next Release)
+- [ ] **Session block detection and management**
+  - [ ] Implement `SessionBlock` data structure with 5-hour billing periods
+  - [ ] Add session block identification algorithm that groups entries by time gaps
+  - [ ] Implement active session detection (block is active if recent activity within session duration)
+  - [ ] Add session start/end time tracking with flooring to hour boundaries
+  - [ ] Support gap detection between session blocks for inactive periods
+  - [ ] Add configurable session duration (default 5 hours matching Claude's billing)
+
+- [ ] **Burn rate calculation and status indicators**
+  - [ ] Add burn rate calculation: `tokensPerMinute = totalTokens / durationMinutes`
+  - [ ] Implement cost burn rate: `costPerHour = (costUSD / durationMinutes) * 60`
+  - [ ] Add status indicator logic: 🟢 NORMAL (<500), 🟡 MODERATE (500-1000), 🔴 HIGH (>1000 tokens/min)
+  - [ ] Use `tokensPerMinuteForIndicator` (input+output only, excluding cache tokens) for consistent thresholds
+  - [ ] Display burn rate in menu with status indicator icons
+
+- [ ] **Session projection and forecasting**
+  - [ ] Implement `ProjectedUsage` calculations for active sessions
+  - [ ] Calculate projected total tokens: `currentTokens + (burnRate * remainingMinutes)`
+  - [ ] Calculate projected total cost: `currentCost + (costPerHour/60 * remainingMinutes)`
+  - [ ] Add remaining session time display: `sessionEndTime - currentTime`
+  - [ ] Show projected final costs in menu dropdown
+
+- [ ] **Enhanced menu bar display and interactions**
+  - [ ] Update status bar to show session status with burn rate indicator
+  - [ ] Add detailed session information: start time, elapsed time, remaining time, progress %
+  - [ ] Display API call count (entries.count) alongside token metrics
+  - [ ] Show inactive session state when no active sessions detected
+  - [ ] Implement 5-second refresh timer for live session updates
+
+- [ ] **Internationalization and localization**
+  - [ ] Add multi-language support
+  - [ ] Implement locale-aware formatting for currencies and numbers
+  - [ ] Add localized menu strings and status messages
+  - [ ] Support system locale detection
+
+### Medium Priority Enhancements
+- [ ] **Advanced session analytics and efficiency tracking**
+  - [ ] Calculate efficiency metrics (tokens per API call): `totalTokens / entries.count`
+  - [ ] Add session history tracking with Core Data persistence
+  - [ ] Implement session trending: compare current vs historical burn rates
+  - [ ] Track model usage patterns across sessions
+  - [ ] Add session duration statistics and analysis
+
+- [ ] **Live monitoring performance optimizations**
+  - [ ] Optimize file parsing with streaming for large JSONL files
+  - [ ] Use background queues for session block calculations
+  - [ ] Implement file sorting by timestamp for chronological processing
+  - [ ] Add graceful error handling for corrupted/unreadable files
+
+- [ ] **Enhanced user interface and experience**
+  - [ ] Add usage limit tracking with reset time display (from JSONL `usageLimitResetTime`)
+  - [ ] Implement progress bars for session progress and token usage
+  - [ ] Show compact vs detailed view modes based on available space
+  - [ ] Add visual status indicators (✓ WITHIN LIMIT, ⚠️ APPROACHING, ❌ EXCEEDED)
+  - [ ] Display model information in session details
+
+### Technical Improvements
+- [x] **Automatic pricing refresh for unknown models**
+  - [x] Detect when an unknown model is encountered
+  - [x] Automatically fetch updated pricing from LiteLLM API
+  - [x] Recalculate costs for entries with the new model
+  - [x] Implement rate limiting to avoid excessive API calls
+  - [x] Update UI automatically when pricing data is refreshed
+  
+- [ ] **Data model enhancements for session blocks**
+  - [ ] Add `SessionBlock` model with required properties: id, startTime, endTime, isActive, isGap
+  - [ ] Implement `LoadedUsageEntry` structure optimized for session processing
+  - [ ] Add burn rate data structure: `tokensPerMinute`, `tokensPerMinuteForIndicator`, `costPerHour`
+  - [ ] Create projection model: `totalTokens`, `totalCost`, `remainingMinutes`
+  - [ ] Support configurable session duration with 5-hour default
+
+- [ ] **Cross-platform compatibility preparation**
+  - [ ] Research Ubuntu/Linux system tray integration options
+  - [ ] Abstract platform-specific UI components
+  - [ ] Add conditional compilation for macOS vs Linux features
+  - [ ] Consider terminal-based compact display for headless environments
+
 ## Optional Enhancements (Future)
 - [ ] Notifications for spending thresholds
 - [x] Historical spending graphs and trends (SpendGraphView implemented)

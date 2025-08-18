@@ -137,6 +137,15 @@ class MenuBarManager: ObservableObject {
                 self?.updateMenu()
             }
             .store(in: &cancellables)
+        
+        // Subscribe to pricing data updates
+        NotificationCenter.default.publisher(for: .pricingDataUpdated)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Logger.menuBar.info("💰 Pricing data updated, refreshing summary")
+                self?.refreshSpendingSummary()
+            }
+            .store(in: &cancellables)
     }
     
     private func setupDateRolloverCheck() {
