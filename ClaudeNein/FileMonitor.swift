@@ -4,7 +4,15 @@ import OSLog
 import CoreServices
 
 /// Monitors Claude config directories for file changes and provides real-time updates
-class FileMonitor: ObservableObject {
+///
+/// This class is marked as `@unchecked Sendable` because:
+/// - All mutable state is protected by appropriate synchronization mechanisms:
+///   - `@Published` properties are synchronized by SwiftUI/Combine
+///   - File monitoring operations run on a dedicated serial queue (`monitorQueue`)
+///   - `pendingChanges` is only accessed from the main thread via Timer callbacks
+/// - FSEvents callbacks are properly synchronized through the monitor queue
+/// - Combine subjects handle their own thread safety
+final class FileMonitor: ObservableObject, @unchecked Sendable {
     
     // MARK: - Properties
     
