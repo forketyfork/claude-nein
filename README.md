@@ -1,6 +1,6 @@
 # <img src="images/icon.png" width="5%"> Claude Nein - Claude Code Spend Monitor
 
-[![Build status](https://github.com/forketyfork/claude-nein/actions/workflows/test.yml/badge.svg)](https://github.com/forketyfork/claude-nein/actions/workflows/test.yml)
+[![Build status](https://github.com/forketyfork/claude-nein/actions/workflows/build.yml/badge.svg)](https://github.com/forketyfork/claude-nein/actions/workflows/build.yml)
 [![Latest Release](https://img.shields.io/github/v/release/forketyfork/claude-nein)](https://github.com/forketyfork/claude-nein/releases/latest)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/language-Swift-orange.svg)](https://www.swift.org/)
