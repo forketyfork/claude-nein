@@ -166,7 +166,7 @@ class DataStore {
         }
     }
     
-    /// Fetch all usage entries from the database
+    /// Fetch all usage entries from the database (to use only in tests)
     func fetchAllEntries() -> [UsageEntry] {
         var results: [UsageEntry] = []
         context.performAndWait {
@@ -289,6 +289,87 @@ class DataStore {
         return breakdown
     }
 
+    // MARK: - Batch Processing
+    
+    /// Process entries for a specific model in batches using a cursor approach
+    /// - Parameters:
+    ///   - modelName: The name of the model to process
+    ///   - batchSize: Number of entries to process at once (default: 100)
+    ///   - processor: Closure that processes each batch and returns updated entries
+    func processEntriesForModel(_ modelName: String, batchSize: Int = 100, processor: @escaping ([UsageEntry]) -> [UsageEntry]) async {
+        await context.perform {
+            let request: NSFetchRequest<UsageEntryEntity> = UsageEntryEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "model == %@", modelName)
+            request.fetchBatchSize = batchSize
+            request.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
+            
+            do {
+                // Use NSFetchedResultsController for efficient batched processing
+                let controller = NSFetchedResultsController(
+                    fetchRequest: request,
+                    managedObjectContext: self.context,
+                    sectionNameKeyPath: nil,
+                    cacheName: nil
+                )
+                
+                try controller.performFetch()
+                
+                guard let fetchedObjects = controller.fetchedObjects else { return }
+                
+                // Process in batches
+                for i in stride(from: 0, to: fetchedObjects.count, by: batchSize) {
+                    let endIndex = min(i + batchSize, fetchedObjects.count)
+                    let batch = Array(fetchedObjects[i..<endIndex])
+                    
+                    // Convert to UsageEntry for processing
+                    let entries = batch.map { entity in
+                        UsageEntry(
+                            id: entity.uniqueHash ?? UUID().uuidString,
+                            timestamp: entity.timestamp,
+                            model: entity.model,
+                            tokenCounts: TokenCounts(
+                                input: Int(entity.inputTokens),
+                                output: Int(entity.outputTokens),
+                                cacheCreation: entity.cacheCreationTokens > 0 ? Int(entity.cacheCreationTokens) : nil,
+                                cacheRead: entity.cacheReadTokens > 0 ? Int(entity.cacheReadTokens) : nil
+                            ),
+                            cost: entity.cost,
+                            sessionId: entity.sessionId?.isEmpty == true ? nil : entity.sessionId,
+                            projectPath: entity.projectPath?.isEmpty == true ? nil : entity.projectPath,
+                            requestId: entity.requestId?.isEmpty == true ? nil : entity.requestId,
+                            originalMessageId: entity.messageId?.isEmpty == true ? nil : entity.messageId
+                        )
+                    }
+                    
+                    // Process the batch
+                    let updatedEntries = processor(entries)
+                    
+                    // Update the entities with new costs
+                    for (index, updatedEntry) in updatedEntries.enumerated() {
+                        if index < batch.count {
+                            let entity = batch[index]
+                            if let newCost = updatedEntry.cost {
+                                entity.cost = newCost
+                            }
+                        }
+                    }
+                    
+                    // Save after each batch to avoid memory buildup
+                    if self.context.hasChanges {
+                        try self.context.save()
+                        // Reset the context to free memory after batch processing
+                        self.context.refreshAllObjects()
+                    }
+                }
+                
+                self.logger.info("✅ Successfully processed entries for model \(modelName) in batches")
+                
+            } catch {
+                self.logger.error("Failed to process entries for model: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     // MARK: - Historical Spend Aggregation
 
     /// Hourly spend for a given day (24 values)
