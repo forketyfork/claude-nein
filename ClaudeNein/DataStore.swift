@@ -419,6 +419,26 @@ class DataStore {
         return values
     }
 
+    /// Tokens used in the last `hours` hours (input + output + cache)
+    func tokensUsed(inLast hours: Double, now: Date = Date()) -> Int {
+        var total = 0
+        context.performAndWait {
+            let start = now.addingTimeInterval(-hours * 3600)
+            let request: NSFetchRequest<UsageEntryEntity> = UsageEntryEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "timestamp >= %@", start as NSDate)
+
+            do {
+                let entries = try context.fetch(request)
+                total = entries.reduce(0) { partial, entry in
+                    partial + Int(entry.inputTokens + entry.outputTokens + entry.cacheCreationTokens + entry.cacheReadTokens)
+                }
+            } catch {
+                logger.error("Failed to fetch session tokens: \(error.localizedDescription)")
+            }
+        }
+        return total
+    }
+
     // MARK: - Available Date Ranges
     
     /// Get the earliest date with data in the database
