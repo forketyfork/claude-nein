@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
       - name: Set build version
@@ -40,7 +40,7 @@ jobs:
           name: ClaudeNein-${{ env.VERSION }}-unsigned
           path: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
       - name: Create draft release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
