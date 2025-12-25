@@ -109,9 +109,12 @@ final class FileMonitor: ObservableObject, Sendable {
             guard let clientCallBackInfo = clientCallBackInfo else { return }
             let monitor = Unmanaged<FileMonitor>.fromOpaque(clientCallBackInfo).takeUnretainedValue()
             guard let paths = unsafeBitCast(eventPaths, to: NSArray.self) as? [String] else { return }
-            
+
+            // Copy FSEvent flags before launching async task since pointers are only valid during callback
+            let flagsCopy = Array(UnsafeBufferPointer(start: eventFlags, count: numEvents))
+
             Task { @MainActor in
-                await monitor.processFileSystemEvents(paths: paths, flags: eventFlags, numEvents: numEvents)
+                await monitor.processFileSystemEvents(paths: paths, flags: flagsCopy)
             }
         }
         
@@ -175,10 +178,10 @@ final class FileMonitor: ObservableObject, Sendable {
     // MARK: - Event Handling
     
     /// Modern async event processing using structured concurrency
-    private func processFileSystemEvents(paths: [String], flags: UnsafePointer<FSEventStreamEventFlags>, numEvents: Int) async {
+    private func processFileSystemEvents(paths: [String], flags: [FSEventStreamEventFlags]) async {
         var changedFiles: [URL] = []
-        
-        for i in 0..<numEvents {
+
+        for i in 0..<flags.count {
             let path = paths[i]
             let eventFlags = flags[i]
             let url = URL(fileURLWithPath: path)
