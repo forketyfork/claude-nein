@@ -2,6 +2,7 @@ import XCTest
 import Combine
 @testable import ClaudeNein
 
+@MainActor
 final class FileMonitorTests: XCTestCase {
     
     var mockAccessManager: MockDirectoryAccessManager!
@@ -55,7 +56,9 @@ final class FileMonitorTests: XCTestCase {
         cancellables = nil
         
         // Stop monitoring
-        fileMonitor?.stopMonitoring()
+        Task {
+            await self.fileMonitor?.stopMonitoring()
+        }
         fileMonitor = nil
         
         // Clean up temporary directory
@@ -73,7 +76,7 @@ final class FileMonitorTests: XCTestCase {
     }
     
     func testFileMonitorPublisherSetup() {
-        XCTAssertNotNil(fileMonitor.fileChanges)
+        XCTAssertNotNil(fileMonitor.fileChangesPublisher)
     }
     
     // MARK: - Access Management Tests
@@ -119,7 +122,7 @@ final class FileMonitorTests: XCTestCase {
         // Set up file change collection
         var detectedFiles: [URL] = []
         
-        fileMonitor.fileChanges
+        fileMonitor.fileChangesPublisher
             .sink { urls in
                 detectedFiles.append(contentsOf: urls)
             }
@@ -165,7 +168,7 @@ final class FileMonitorTests: XCTestCase {
         // Set up file change collection
         var detectedFiles: [URL] = []
         
-        fileMonitor.fileChanges
+        fileMonitor.fileChangesPublisher
             .sink { urls in
                 detectedFiles.append(contentsOf: urls)
             }
@@ -217,7 +220,7 @@ final class FileMonitorTests: XCTestCase {
         // Set up file change collection
         var detectedFiles: [URL] = []
         
-        fileMonitor.fileChanges
+        fileMonitor.fileChangesPublisher
             .sink { urls in
                 detectedFiles.append(contentsOf: urls)
             }
@@ -266,7 +269,7 @@ final class FileMonitorTests: XCTestCase {
         // Set up file change collection
         var detectedFiles: [URL] = []
         
-        fileMonitor.fileChanges
+        fileMonitor.fileChangesPublisher
             .sink { urls in
                 detectedFiles.append(contentsOf: urls)
             }
@@ -317,7 +320,7 @@ final class FileMonitorTests: XCTestCase {
         }
         
         // Stop monitoring
-        fileMonitor.stopMonitoring()
+        await fileMonitor.stopMonitoring()
         
         // Wait for monitoring to stop
         try await waitForCondition {
