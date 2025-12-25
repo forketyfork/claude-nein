@@ -54,17 +54,22 @@ final class FileMonitorTests: XCTestCase {
     override func tearDown() {
         cancellables.forEach { $0.cancel() }
         cancellables = nil
-        
-        // Stop monitoring
-        Task {
-            await self.fileMonitor?.stopMonitoring()
+
+        // Stop monitoring synchronously to avoid race conditions between tests
+        if let monitor = fileMonitor {
+            let expectation = XCTestExpectation(description: "Stop monitoring")
+            Task { @MainActor in
+                await monitor.stopMonitoring()
+                expectation.fulfill()
+            }
+            wait(for: [expectation], timeout: 5.0)
         }
         fileMonitor = nil
-        
+
         // Clean up temporary directory
         mockAccessManager?.cleanupTestDirectory()
         mockAccessManager = nil
-        
+
         super.tearDown()
     }
     
