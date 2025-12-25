@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
       - name: Set build version
@@ -35,7 +35,7 @@ jobs:
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent build/Build/Products/Release/ClaudeNein.app "dist/ClaudeNein-${VERSION}-unsigned.zip"
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ClaudeNein-${{ env.VERSION }}-unsigned
           path: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
