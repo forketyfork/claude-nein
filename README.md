@@ -28,6 +28,7 @@ Claude Nein lives in your macOS menu bar, keeping you constantly updated on your
 - **Automatic & Efficient Monitoring** – uses FSEvents to watch Claude log files with minimal overhead.
 - **Persistent Data Storage** – usage is cached locally in Core Data so data survives restarts.
 - **Run at Startup Option** – enable automatic launch when you log in.
+- **Session Token Alerts** – optional notifications as you approach the 5‑hour session token limit.
 - **Database Management** – built in "Reload Database" command clears and reloads cached usage.
 - **Spend Graphs** – interactive graph view showing spending trends by day, month, or year with navigation controls and switchable plot types (bar and cumulative).
 - **Secure & Private** – all processing happens on your Mac; the only network request fetches pricing information.

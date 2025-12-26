@@ -16,7 +16,7 @@ struct ClaudeNeinApp: App {
     
     var body: some Scene {
         Settings {
-            EmptyView()
+            PreferencesView()
         }
     }
 }
@@ -36,6 +36,7 @@ class MenuBarManager: ObservableObject {
     private let homeDirectoryAccessManager: HomeDirectoryAccessManager
     private let launchAtLoginManager = LaunchAtLoginManager.shared
     private let dataStore = DataStore.shared
+    private let sessionAlertManager = SessionAlertManager.shared
     
     // Animation properties
     private var previousSpendValue: Double = 0.0
@@ -172,13 +173,16 @@ class MenuBarManager: ObservableObject {
         if !calendar.isDate(currentDateStart, inSameDayAs: self.lastKnownDate) {
             Logger.app.info("🌅 Date rollover detected - refreshing spend data")
             Logger.app.debug("🕛 Date changed from \(self.lastKnownDate) to \(currentDateStart)")
-            
+
             // Update the last known date
             self.lastKnownDate = currentDateStart
-            
+
             // Refresh spending summary to reflect new day boundaries
             self.refreshSpendingSummary()
         }
+
+        // Always check session token usage periodically
+        self.checkSessionLimits()
     }
     
     private func setupMenu() {
@@ -247,6 +251,10 @@ class MenuBarManager: ObservableObject {
         graphItem.target = self
         menu.addItem(graphItem)
 
+        let preferencesItem = NSMenuItem(title: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
+        preferencesItem.target = self
+        menu.addItem(preferencesItem)
+
         let launchAtLoginItem = NSMenuItem(title: "Run at Startup", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLoginItem.target = self
         launchAtLoginItem.state = launchAtLoginManager.isEnabled ? .on : .off
@@ -313,7 +321,7 @@ class MenuBarManager: ObservableObject {
             Logger.app.info("❌ User cancelled database reload")
         }
     }
-    
+
     @objc private func requestAccess() {
         Logger.security.info("🔒 User requested home directory access")
         Task {
@@ -328,7 +336,11 @@ class MenuBarManager: ObservableObject {
             Logger.security.info("🔒 Home directory access request result: \(granted)")
         }
     }
-    
+
+    @objc private func showPreferences() {
+        NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+    }
+
     @objc private func revokeAccess() {
         Logger.security.info("🚫 User requested to revoke home directory access")
         homeDirectoryAccessManager.revokeAccess()
@@ -448,13 +460,32 @@ class MenuBarManager: ObservableObject {
             let newSummary = dataStore.fetchSpendSummary()
             DispatchQueue.main.async { [weak self] in
                 self?.currentSummary = newSummary
+                self?.checkSessionLimits()
                 Logger.calculator.info("💰 Updated spend summary - Today: $\(String(format: "%.2f", newSummary.todaySpend))")
             }
         }
     }
     
     // MARK: - Private Helper Methods
-    
+
+    private func checkSessionLimits() {
+        let tokens = dataStore.tokensUsed(inLast: 5)
+        let level = sessionAlertManager.evaluate(tokensUsed: tokens)
+        applyAlertColor(level)
+    }
+
+    private func applyAlertColor(_ level: SessionAlertLevel) {
+        guard let statusButton = statusItem?.button else { return }
+        switch level {
+        case .warning:
+            statusButton.contentTintColor = .systemOrange
+        case .critical:
+            statusButton.contentTintColor = .systemRed
+        case .none:
+            statusButton.contentTintColor = nil
+        }
+    }
+
     private func updateStatusBarTitle() {
         guard let statusButton = statusItem?.button else {
             Logger.menuBar.error("❌ Cannot update status bar title - no status button")

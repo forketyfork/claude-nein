@@ -107,14 +107,14 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Support dark/light mode
 
 ### Phase 7: Settings & Preferences
-- [ ] Create preferences window (optional):
+- [x] Create preferences window (optional):
   - [ ] Custom Claude config directory path
   - [ ] Refresh interval settings
   - [ ] Cost display format preferences
-- [ ] Implement UserDefaults storage:
-  - [ ] Save user preferences
-  - [ ] Handle preference changes
-  - [ ] Provide sensible defaults
+- [x] Implement UserDefaults storage:
+  - [x] Save user preferences
+  - [x] Handle preference changes
+  - [x] Provide sensible defaults
 - [x] Add launch at login functionality:
   - [x] "Run at Startup" menu item with persistent toggle
   - [x] LaunchAtLoginManager implementation
@@ -294,7 +294,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [ ] Consider terminal-based compact display for headless environments
 
 ## Optional Enhancements (Future)
-- [ ] Notifications for spending thresholds
+- [x] Notifications for spending thresholds
 - [x] Historical spending graphs and trends (SpendGraphView implemented)
 - [x] Dropdown selectors for date/month/year in spend graph
 - [x] Toggle between bar and cumulative plots in spend graph
