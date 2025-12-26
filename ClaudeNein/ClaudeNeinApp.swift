@@ -21,6 +21,7 @@ struct ClaudeNeinApp: App {
     }
 }
 
+@MainActor
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
 
@@ -91,6 +92,12 @@ class MenuBarManager: ObservableObject {
         Logger.app.info("🛑 Deinitializing MenuBarManager")
         animationTimer?.invalidate()
         dateCheckTimer?.invalidate()
+        
+        // Stop file monitoring using modern async cleanup
+        Task { [fileMonitor] in
+            await fileMonitor.stopMonitoring()
+        }
+        
         statusItem = nil
         Logger.app.info("✅ MenuBarManager deinitialized")
     }
@@ -117,8 +124,8 @@ class MenuBarManager: ObservableObject {
     private func setupStateSubscriptions() {
         Logger.fileMonitor.debug("🔧 Setting up state subscriptions")
         
-        // Subscribe to file changes from the monitor
-        fileMonitor.fileChanges
+        // Subscribe to file changes from the monitor using the backward-compatible publisher
+        fileMonitor.fileChangesPublisher
             .receive(on: DispatchQueue.global(qos: .background))
             .sink { [weak self] changedFiles in
                 guard let self = self else { return }
