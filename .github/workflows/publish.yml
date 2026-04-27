@@ -35,12 +35,12 @@ jobs:
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent build/Build/Products/Release/ClaudeNein.app "dist/ClaudeNein-${VERSION}-unsigned.zip"
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ClaudeNein-${{ env.VERSION }}-unsigned
           path: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
       - name: Create draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           files: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
