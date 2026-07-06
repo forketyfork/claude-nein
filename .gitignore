@@ -107,6 +107,9 @@ Thumbs.db
 *.swo
 *~
 
+# Local agent tooling state
+.architect/
+
 # Temporary files
 *.tmp
 

@@ -107,6 +107,10 @@ Claude Nein is designed with privacy as a priority:
 -   **Limited Permissions**: The app only requests the read-only permissions necessary to access Claude's log files.
 -   **Transparent Pricing Updates**: The only network request made is to the public LiteLLM GitHub repository to fetch `model_prices_and_context_window.json`.
 
+## Documentation
+
+- [`docs/macos-certificate-rotation.md`](docs/macos-certificate-rotation.md): rotate the macOS developer certificate used for signed release builds.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to open an issue or submit a pull request.

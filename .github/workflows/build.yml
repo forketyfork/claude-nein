@@ -16,12 +16,6 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Import Code-Signing Certificates
-      uses: Apple-Actions/import-codesign-certs@v6
-      with:
-        p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
-        p12-password: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-    
     - name: Build and test
       run: |
         xcodebuild test \
@@ -29,4 +23,7 @@ jobs:
           -scheme ClaudeNein \
           -destination 'platform=macOS' \
           -configuration Debug \
-          -enableCodeCoverage YES
+          -enableCodeCoverage YES \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO
