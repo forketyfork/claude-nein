@@ -38,7 +38,7 @@ jobs:
           name: ClaudeNein-${{ env.VERSION }}-unsigned
           path: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
       - name: Create draft release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v3.0.1
         with:
           draft: true
           files: "dist/ClaudeNein-${{ env.VERSION }}-unsigned.zip"
