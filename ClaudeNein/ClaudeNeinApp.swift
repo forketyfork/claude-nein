@@ -160,7 +160,9 @@ class MenuBarManager: ObservableObject {
         
         // Start a timer that fires every minute to check for date changes
         dateCheckTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
-            self?.checkForDateRollover()
+            MainActor.assumeIsolated {
+                self?.checkForDateRollover()
+            }
         }
     }
     
@@ -504,7 +506,9 @@ class MenuBarManager: ObservableObject {
                 // Final step - ensure we end exactly at the target value
                 updateBlock(endValue)
                 timer.invalidate()
-                self?.animationTimer = nil
+                MainActor.assumeIsolated {
+                    self?.animationTimer = nil
+                }
             } else {
                 // Intermediate step
                 let currentValue = startValue + (stepIncrement * Double(currentStep))
