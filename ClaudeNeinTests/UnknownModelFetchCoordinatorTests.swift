@@ -517,6 +517,63 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         let timeUntilNextFetch = await coordinator.timeUntilNextFetch()
         XCTAssertEqual(timeUntilNextFetch, 50, accuracy: 0.001)
     }
+
+    /// Test that a request joining a failed refresh schedules the unknown-model retry.
+    func testRequestJoiningFailedRefreshSchedulesRetry() async {
+        let requestsRegistered = expectation(description: "refresh and unknown-model request are registered")
+        requestsRegistered.expectedFulfillmentCount = 2
+        let fixedTime = Date(timeIntervalSince1970: 1_000)
+        let coordinator = UnknownModelFetchCoordinator(
+            now: { fixedTime },
+            onRequestRegistered: {
+                requestsRegistered.fulfill()
+            }
+        )
+        let fetchStarted = AsyncGate()
+        let releaseFetch = AsyncGate()
+        let fetchFailureCount = Atomic<Int>(0)
+        let retryRequiredCount = Atomic<Int>(0)
+
+        let refreshTask = Task {
+            await coordinator.refreshPricing(
+                fetcher: {
+                    await fetchStarted.open()
+                    await releaseFetch.wait()
+                    throw PricingError.networkError
+                },
+                onFetchFailed: {
+                    fetchFailureCount.increment()
+                }
+            )
+        }
+
+        await fetchStarted.wait()
+        let joinedRequestTask = Task {
+            await coordinator.requestPricingForUnknownModel(
+                "model-joining-failed-refresh",
+                fetcher: {
+                    XCTFail("A joining request must not start another fetch")
+                    return self.mockPricing(withModels: [])
+                },
+                onRetryRequired: {
+                    retryRequiredCount.increment()
+                }
+            )
+        }
+        await fulfillment(of: [requestsRegistered], timeout: 1)
+
+        await releaseFetch.open()
+
+        let refreshResult = await refreshTask.value
+        let joinedRequestResult = await joinedRequestTask.value
+        let hasPendingModels = await coordinator.hasPendingModels()
+
+        XCTAssertNil(refreshResult)
+        XCTAssertNil(joinedRequestResult)
+        XCTAssertEqual(fetchFailureCount.value, 1)
+        XCTAssertEqual(retryRequiredCount.value, 1)
+        XCTAssertTrue(hasPendingModels)
+    }
     
     /// Test that failed fetches don't clear pending models
     func testFailedFetchKeepsPendingModels() async {

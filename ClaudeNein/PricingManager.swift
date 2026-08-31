@@ -71,7 +71,11 @@ actor UnknownModelFetchCoordinator {
                 )
             }
 
-            return await fetchTask.value
+            let pricing = await fetchTask.value
+            if pricing == nil && !startedFetch {
+                await onRetryRequired?()
+            }
+            return pricing
         }
         
         // No fetch available or in cooldown
