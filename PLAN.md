@@ -50,6 +50,8 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [x] Reconcile scheduled pricing refreshes with pending unknown models
 - [x] Reprice models that join a shared pricing fetch during completion
 - [x] Keep pricing refresh timer lifecycle isolated to the main actor
+- [x] Finalize fetched pricing only after dependent cost records are repriced
+- [x] Reschedule unknown-model retries when late joiners remain unresolved
 - [x] Implement cost calculation logic:
   - [x] Calculate costs from token counts using model pricing
   - [x] Handle different token types (input, output, cache)
@@ -170,6 +172,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Verify cost calculation accuracy
   - [x] Test app behavior during active Claude sessions
 - [x] Regression-test concurrent unknown-model pricing resolution
+- [x] Synchronize concurrent unknown-model regression tests with explicit registration signals
 - [x] Polish user experience:
   - [x] Smooth animations and transitions (menu bar icon animations)
   - [x] Intuitive menu interactions
