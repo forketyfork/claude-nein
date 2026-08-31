@@ -318,10 +318,13 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     func testRapidSuccessiveRequests() async {
         let coordinator = UnknownModelFetchCoordinator()
         let fetchCallCount = Atomic<Int>(0)
+        let fetchStarted = AsyncGate()
+        let releaseFetch = AsyncGate()
         
         let fetcher: () async throws -> ModelPricing = {
             fetchCallCount.increment()
-            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            await fetchStarted.open()
+            await releaseFetch.wait()
             return self.mockPricing(withModels: ["model-1", "model-2", "model-3", "model-4", "model-5"])
         }
         
@@ -332,9 +335,18 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
                 await coordinator.requestPricingForUnknownModel("model-\(i)", fetcher: fetcher)
             }
             tasks.append(task)
-            // Small delay between requests to simulate rapid but not simultaneous
-            try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
         }
+
+        await fetchStarted.wait()
+        var allRequestsRegistered = false
+        for _ in 0..<100 {
+            if await coordinator.pendingModelCount() == 5 {
+                allRequestsRegistered = true
+                break
+            }
+            await Task.yield()
+        }
+        await releaseFetch.open()
         
         // Wait for all to complete
         var results: [ModelPricing?] = []
@@ -342,6 +354,8 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
             results.append(await task.value)
         }
         
+        XCTAssertTrue(allRequestsRegistered)
+
         // All should have received pricing
         for result in results {
             XCTAssertNotNil(result)

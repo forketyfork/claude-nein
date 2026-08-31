@@ -81,6 +81,10 @@ actor UnknownModelFetchCoordinator {
     func hasPendingModels() -> Bool {
         return !pendingUnknownModels.isEmpty
     }
+
+    func pendingModelCount() -> Int {
+        pendingUnknownModels.count
+    }
     
     /// Get the time until next fetch is allowed
     func timeUntilNextFetch() -> TimeInterval {
