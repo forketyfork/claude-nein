@@ -45,6 +45,8 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Implement offline fallback with bundled pricing data
 - [x] Cache pricing data locally with expiration
 - [x] Persist pricing data to Core Data with 4h refresh schedule
+- [x] Deduplicate unknown-model pricing requests and consolidate post-fetch updates
+- [x] Keep pricing refresh timer lifecycle isolated to the main actor
 - [x] Implement cost calculation logic:
   - [x] Calculate costs from token counts using model pricing
   - [x] Handle different token types (input, output, cache)
@@ -164,6 +166,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Test with real Claude Code usage data
   - [x] Verify cost calculation accuracy
   - [x] Test app behavior during active Claude sessions
+- [x] Regression-test concurrent unknown-model pricing resolution
 - [x] Polish user experience:
   - [x] Smooth animations and transitions (menu bar icon animations)
   - [x] Intuitive menu interactions

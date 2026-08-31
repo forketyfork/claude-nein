@@ -62,7 +62,74 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         // Should have only fetched once
         XCTAssertEqual(fetchCallCount.value, 1, "Should only fetch once for concurrent requests")
     }
-    
+
+    /// Test that shared fetch completion work is performed once for concurrent requests.
+    func testConcurrentRequestsInvokeSharedResolutionHandlerOnce() async {
+        let coordinator = UnknownModelFetchCoordinator()
+        let completionCallCount = Atomic<Int>(0)
+        let resolvedModelCount = Atomic<Int>(0)
+        let fetchedModelCount = Atomic<Int>(0)
+
+        let fetcher: () async throws -> ModelPricing = {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            return self.mockPricing(withModels: ["claude-new-model"])
+        }
+        let onFetchCompleted: @Sendable (ModelPricing, Set<String>) async -> Void = { pricing, resolvedModels in
+            completionCallCount.increment()
+            fetchedModelCount.set(pricing.models.count)
+            resolvedModelCount.set(resolvedModels.count)
+        }
+
+        async let result1 = coordinator.requestPricingForUnknownModel(
+            "claude-new-model",
+            fetcher: fetcher,
+            onFetchCompleted: onFetchCompleted
+        )
+        async let result2 = coordinator.requestPricingForUnknownModel(
+            "claude-new-model",
+            fetcher: fetcher,
+            onFetchCompleted: onFetchCompleted
+        )
+        async let result3 = coordinator.requestPricingForUnknownModel(
+            "claude-new-model",
+            fetcher: fetcher,
+            onFetchCompleted: onFetchCompleted
+        )
+
+        let results = await [result1, result2, result3]
+
+        XCTAssertTrue(results.allSatisfy { $0 != nil })
+        XCTAssertEqual(completionCallCount.value, 1)
+        XCTAssertEqual(fetchedModelCount.value, 1)
+        XCTAssertEqual(resolvedModelCount.value, 1)
+    }
+
+    /// Test that only one task owns resolution work for a model at a time.
+    func testUnknownModelRequestGateDeduplicatesAndCanBeReused() async {
+        let gate = UnknownModelRequestGate()
+
+        let acquiredCount = await withTaskGroup(of: Bool.self, returning: Int.self) { group in
+            for _ in 0..<100 {
+                group.addTask {
+                    gate.begin("claude-new-model")
+                }
+            }
+
+            var count = 0
+            for await acquired in group where acquired {
+                count += 1
+            }
+            return count
+        }
+
+        XCTAssertEqual(acquiredCount, 1)
+
+        gate.finish("claude-new-model")
+        let acquiredAfterRelease = gate.begin("claude-new-model")
+        XCTAssertTrue(acquiredAfterRelease)
+        gate.finish("claude-new-model")
+    }
+
     /// Test that requests for different unknown models still use a single fetch
     func testMultipleDifferentUnknownModels() async {
         let coordinator = UnknownModelFetchCoordinator()
@@ -231,7 +298,7 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
 // MARK: - Test Helpers
 
 /// Thread-safe counter for testing
-private class Atomic<T> {
+private final class Atomic<T>: @unchecked Sendable {
     private var value_: T
     private let lock = NSLock()
     
