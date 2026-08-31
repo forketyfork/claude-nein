@@ -46,6 +46,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [x] Cache pricing data locally with expiration
 - [x] Persist pricing data to Core Data with 4h refresh schedule
 - [x] Deduplicate unknown-model pricing requests and consolidate post-fetch updates
+- [x] Keep unresolved model requests gated through the retry cooldown
 - [x] Keep pricing refresh timer lifecycle isolated to the main actor
 - [x] Implement cost calculation logic:
   - [x] Calculate costs from token counts using model pricing

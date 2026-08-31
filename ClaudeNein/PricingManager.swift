@@ -94,10 +94,17 @@ actor UnknownModelFetchCoordinator {
 final class UnknownModelRequestGate: @unchecked Sendable {
     private let lock = NSLock()
     private var activeModels = Set<String>()
+    private var retryAfter = [String: Date]()
 
     func begin(_ modelName: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
+
+        if let retryDate = retryAfter[modelName] {
+            guard Date() >= retryDate else { return false }
+            retryAfter.removeValue(forKey: modelName)
+        }
+
         return activeModels.insert(modelName).inserted
     }
 
@@ -105,6 +112,14 @@ final class UnknownModelRequestGate: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         activeModels.remove(modelName)
+        retryAfter.removeValue(forKey: modelName)
+    }
+
+    func finishForRetry(_ modelName: String, after delay: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        activeModels.remove(modelName)
+        retryAfter[modelName] = Date().addingTimeInterval(max(0, delay))
     }
 }
 
@@ -235,17 +250,26 @@ final class PricingManager: @unchecked Sendable {
             guard requestGate.begin(modelName) else { return 0.0 }
 
             Task { [weak self, requestGate] in
-                defer { requestGate.finish(modelName) }
-                guard let self = self else { return }
+                guard let self = self else {
+                    requestGate.finish(modelName)
+                    return
+                }
 
                 // Request pricing through the coordinator
-                _ = await unknownModelCoordinator.requestPricingForUnknownModel(modelName, fetcher: { [weak self] in
+                let fetchedPricing = await unknownModelCoordinator.requestPricingForUnknownModel(modelName, fetcher: { [weak self] in
                     guard let self = self else { throw PricingError.noPricingData }
                     return try await self.fetchPricingFromAPI()
                 }, onFetchCompleted: { [weak self] pricing, resolvedModels in
                     guard let self = self else { return }
                     await self.applyFetchedPricing(pricing, resolvedModels: resolvedModels)
                 })
+
+                if fetchedPricing?.models[modelName] != nil {
+                    requestGate.finish(modelName)
+                } else {
+                    let retryDelay = await unknownModelCoordinator.timeUntilNextFetch()
+                    requestGate.finishForRetry(modelName, after: retryDelay)
+                }
             }
             
             return 0.0

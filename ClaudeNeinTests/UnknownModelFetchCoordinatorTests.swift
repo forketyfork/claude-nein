@@ -124,9 +124,13 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(acquiredCount, 1)
 
+        gate.finishForRetry("claude-new-model", after: 60)
+        let acquiredDuringRetryWindow = gate.begin("claude-new-model")
+        XCTAssertFalse(acquiredDuringRetryWindow)
+
         gate.finish("claude-new-model")
-        let acquiredAfterRelease = gate.begin("claude-new-model")
-        XCTAssertTrue(acquiredAfterRelease)
+        let acquiredAfterReset = gate.begin("claude-new-model")
+        XCTAssertTrue(acquiredAfterReset)
         gate.finish("claude-new-model")
     }
 
