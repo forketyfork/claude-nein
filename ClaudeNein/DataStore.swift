@@ -63,37 +63,39 @@ class DataStore {
         guard !entries.isEmpty else { return }
         
         self.logger.info("📝 Starting upsert of \(entries.count) entries")
-        
+
+        let context = self.context
+        let logger = self.logger
         await context.perform {
             // Deduplicate incoming entries by their unique hash
             var seenHashes = Set<String>()
             let deduplicatedEntries = entries.compactMap { entry -> UsageEntry? in
-                guard let hash = entry.uniqueHash() else { 
+                guard let hash = entry.uniqueHash() else {
                     return entry // Keep entries without hash for later filtering
                 }
                 if seenHashes.contains(hash) {
-                    self.logger.debug("🔄 Skipping duplicate incoming entry with hash: \(hash)")
+                    logger.debug("🔄 Skipping duplicate incoming entry with hash: \(hash)")
                     return nil
                 }
                 seenHashes.insert(hash)
                 return entry
             }
-            
+
             // Create unique hashes for deduplicated entries
             let entryHashes = deduplicatedEntries.compactMap { $0.uniqueHash() }
-            
+
             let entriesWithoutHash = deduplicatedEntries.count - entryHashes.count
             if entriesWithoutHash > 0 {
-                self.logger.warning("⚠️ \(entriesWithoutHash) entries could not generate unique hashes")
+                logger.warning("⚠️ \(entriesWithoutHash) entries could not generate unique hashes")
             }
-            
+
             // Fetch existing entries that match these hashes
             let request: NSFetchRequest<UsageEntryEntity> = UsageEntryEntity.fetchRequest()
             request.predicate = NSPredicate(format: "uniqueHash IN %@", entryHashes)
-            
+
             do {
-                let existingEntities = try self.context.fetch(request)
-                
+                let existingEntities = try context.fetch(request)
+
                 // Use Dictionary(_, uniquingKeysWith:) to handle potential duplicates
                 let existingEntitiesByHash = Dictionary(existingEntities.compactMap { entity -> (String, UsageEntryEntity)? in
                     guard let hash = entity.uniqueHash else { return nil }
@@ -101,15 +103,15 @@ class DataStore {
                 }, uniquingKeysWith: { existing, _ in
                     return existing
                 })
-                
+
                 for entry in deduplicatedEntries {
-                    guard let hash = entry.uniqueHash() else { 
-                        self.logger.warning("Skipping entry without uniqueHash: requestId=\(entry.requestId ?? "nil"), originalMessageId=\(entry.originalMessageId ?? "nil")")
-                        continue 
+                    guard let hash = entry.uniqueHash() else {
+                        logger.warning("Skipping entry without uniqueHash: requestId=\(entry.requestId ?? "nil"), originalMessageId=\(entry.originalMessageId ?? "nil")")
+                        continue
                     }
-                    
+
                     // Find an existing entity or create a new one
-                    let entity = existingEntitiesByHash[hash] ?? UsageEntryEntity(context: self.context)
+                    let entity = existingEntitiesByHash[hash] ?? UsageEntryEntity(context: context)
                     
                     // Populate entity data from the entry
                     entity.uniqueHash = hash
@@ -133,35 +135,35 @@ class DataStore {
                 }
                 
                 // Save if there are any changes
-                if self.context.hasChanges {
-                    let insertedObjects = self.context.insertedObjects.count
-                    let updatedObjects = self.context.updatedObjects.count
-                    
-                    try self.context.save()
-                    self.logger.info("✅ Successfully upserted entries: \(insertedObjects) new, \(updatedObjects) updated")
+                if context.hasChanges {
+                    let insertedObjects = context.insertedObjects.count
+                    let updatedObjects = context.updatedObjects.count
+
+                    try context.save()
+                    logger.info("✅ Successfully upserted entries: \(insertedObjects) new, \(updatedObjects) updated")
                 }
             } catch {
-                self.logger.error("Failed to upsert entries: \(error.localizedDescription)")
-                
+                logger.error("Failed to upsert entries: \(error.localizedDescription)")
+
                 // Log detailed validation errors
                 let validationError = error as NSError
-                self.logger.error("Error code: \(validationError.code)")
-                self.logger.error("Error domain: \(validationError.domain)")
-                
+                logger.error("Error code: \(validationError.code)")
+                logger.error("Error domain: \(validationError.domain)")
+
                 if let detailedErrors = validationError.userInfo[NSDetailedErrorsKey] as? [NSError] {
                     for detailError in detailedErrors {
-                        self.logger.error("Validation error: \(detailError.localizedDescription)")
+                        logger.error("Validation error: \(detailError.localizedDescription)")
                         if let object = detailError.userInfo[NSValidationObjectErrorKey] as? NSManagedObject {
-                            self.logger.error("Failed object: \(object)")
+                            logger.error("Failed object: \(object)")
                         }
                         if let key = detailError.userInfo[NSValidationKeyErrorKey] as? String {
-                            self.logger.error("Failed property: \(key)")
+                            logger.error("Failed property: \(key)")
                         }
                     }
                 }
-                
+
                 // Rollback in case of error to maintain data integrity
-                self.context.rollback()
+                context.rollback()
             }
         }
     }
@@ -297,17 +299,19 @@ class DataStore {
     ///   - batchSize: Number of entries to process at once (default: 100)
     ///   - processor: Closure that processes each batch and returns updated entries
     func processEntriesForModel(_ modelName: String, batchSize: Int = 100, processor: @escaping ([UsageEntry]) -> [UsageEntry]) async {
+        let context = self.context
+        let logger = self.logger
         await context.perform {
             let request: NSFetchRequest<UsageEntryEntity> = UsageEntryEntity.fetchRequest()
             request.predicate = NSPredicate(format: "model == %@", modelName)
             request.fetchBatchSize = batchSize
             request.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
-            
+
             do {
                 // Use NSFetchedResultsController for efficient batched processing
                 let controller = NSFetchedResultsController(
                     fetchRequest: request,
-                    managedObjectContext: self.context,
+                    managedObjectContext: context,
                     sectionNameKeyPath: nil,
                     cacheName: nil
                 )
@@ -355,17 +359,17 @@ class DataStore {
                     }
                     
                     // Save after each batch to avoid memory buildup
-                    if self.context.hasChanges {
-                        try self.context.save()
+                    if context.hasChanges {
+                        try context.save()
                         // Reset the context to free memory after batch processing
-                        self.context.refreshAllObjects()
+                        context.refreshAllObjects()
                     }
                 }
-                
-                self.logger.info("✅ Successfully processed entries for model \(modelName) in batches")
-                
+
+                logger.info("✅ Successfully processed entries for model \(modelName) in batches")
+
             } catch {
-                self.logger.error("Failed to process entries for model: \(error.localizedDescription)")
+                logger.error("Failed to process entries for model: \(error.localizedDescription)")
             }
         }
     }
