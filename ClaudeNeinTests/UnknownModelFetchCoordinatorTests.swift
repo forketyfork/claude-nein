@@ -164,6 +164,86 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         let hasPending = await coordinator.hasPendingModels()
         XCTAssertFalse(hasPending, "Should have no pending models after successful fetch")
     }
+
+    /// Test that pricing fetched outside the coordinator clears resolved pending models.
+    func testExternallyFetchedPricingReconcilesPendingModels() async {
+        let coordinator = UnknownModelFetchCoordinator()
+        let fetcher: () async throws -> ModelPricing = {
+            self.mockPricing(withModels: [])
+        }
+
+        let result = await coordinator.requestPricingForUnknownModel("model-from-scheduled-refresh", fetcher: fetcher)
+        XCTAssertNotNil(result)
+
+        let resolvedModels = await coordinator.reconcileResolvedModels(
+            in: mockPricing(withModels: ["model-from-scheduled-refresh"])
+        )
+
+        XCTAssertEqual(resolvedModels, ["model-from-scheduled-refresh"])
+        let hasPending = await coordinator.hasPendingModels()
+        XCTAssertFalse(hasPending)
+    }
+
+    /// Test that models added while shared completion is suspended are reconciled and reported separately.
+    func testLateJoinerReceivesResolutionCallback() async {
+        let coordinator = UnknownModelFetchCoordinator()
+        let callbackStarted = AsyncGate()
+        let releaseCallback = AsyncGate()
+        let sharedCallbackCount = Atomic<Int>(0)
+        let lateResolvedModels = Atomic<Set<String>>([])
+
+        let fetcher: () async throws -> ModelPricing = {
+            self.mockPricing(withModels: ["model-a", "model-b"])
+        }
+
+        let firstRequest = Task {
+            await coordinator.requestPricingForUnknownModel(
+                "model-a",
+                fetcher: fetcher,
+                onFetchCompleted: { _, resolvedModels in
+                    sharedCallbackCount.increment()
+                    XCTAssertEqual(resolvedModels, ["model-a"])
+                    await callbackStarted.open()
+                    await releaseCallback.wait()
+                },
+                onLateModelsResolved: { _ in
+                    XCTFail("The initial request should not receive a late resolution callback")
+                }
+            )
+        }
+
+        await callbackStarted.wait()
+
+        let lateRequest = Task {
+            await coordinator.requestPricingForUnknownModel(
+                "model-b",
+                fetcher: fetcher,
+                onLateModelsResolved: { resolvedModels in
+                    lateResolvedModels.set(resolvedModels)
+                }
+            )
+        }
+
+        var lateRequestStarted = false
+        for _ in 0..<100 {
+            if await coordinator.hasPendingModels() {
+                lateRequestStarted = true
+                break
+            }
+            await Task.yield()
+        }
+        XCTAssertTrue(lateRequestStarted)
+
+        await releaseCallback.open()
+        let firstResult = await firstRequest.value
+        let lateResult = await lateRequest.value
+        XCTAssertNotNil(firstResult)
+        XCTAssertNotNil(lateResult)
+        XCTAssertEqual(sharedCallbackCount.value, 1)
+        XCTAssertEqual(lateResolvedModels.value, ["model-b"])
+        let hasPending = await coordinator.hasPendingModels()
+        XCTAssertFalse(hasPending)
+    }
     
     /// Test the 60-second cooldown between fetches
     func testCooldownBetweenFetches() async {
@@ -320,6 +400,30 @@ private final class Atomic<T>: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         value_ = newValue
+    }
+}
+
+private actor AsyncGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if isOpen {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func open() {
+        isOpen = true
+        let pendingWaiters = waiters
+        waiters.removeAll()
+        for waiter in pendingWaiters {
+            waiter.resume()
+        }
     }
 }
 

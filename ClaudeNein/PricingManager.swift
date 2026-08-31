@@ -16,7 +16,8 @@ actor UnknownModelFetchCoordinator {
     func requestPricingForUnknownModel(
         _ modelName: String,
         fetcher: @escaping () async throws -> ModelPricing,
-        onFetchCompleted: (@Sendable (ModelPricing, Set<String>) async -> Void)? = nil
+        onFetchCompleted: (@Sendable (ModelPricing, Set<String>) async -> Void)? = nil,
+        onLateModelsResolved: (@Sendable (Set<String>) async -> Void)? = nil
     ) async -> ModelPricing? {
         // Add to pending set
         pendingUnknownModels.insert(modelName)
@@ -24,25 +25,19 @@ actor UnknownModelFetchCoordinator {
         // Check if we should trigger a new fetch
         let now = Date()
         let timeSinceLastFetch = now.timeIntervalSince(lastFetchAttempt)
+        var startedFetch = false
         
         // If there's no active fetch and cooldown has passed, start a new fetch
         if activeFetchTask == nil && timeSinceLastFetch >= fastRefreshInterval {
             lastFetchAttempt = now
+            startedFetch = true
             
             // Create a new fetch task that all waiters can share
             let fetchTask = Task<ModelPricing?, Never> {
                 do {
                     let pricing = try await fetcher()
-                    
-                    // Check which models were resolved
-                    let resolvedModels = pendingUnknownModels.intersection(Set(pricing.models.keys))
-                    
-                    // Remove resolved models from pending
-                    pendingUnknownModels.subtract(resolvedModels)
-                    
-                    if !resolvedModels.isEmpty {
-                        Logger.calculator.info("✅ Resolved pricing for \(resolvedModels.count) unknown model(s)")
-                    }
+
+                    let resolvedModels = reconcileResolvedModels(in: pricing)
 
                     if let onFetchCompleted {
                         await onFetchCompleted(pricing, resolvedModels)
@@ -66,7 +61,16 @@ actor UnknownModelFetchCoordinator {
         
         // Wait for the active fetch task if there is one
         if let fetchTask = activeFetchTask {
-            return await fetchTask.value
+            guard let pricing = await fetchTask.value else { return nil }
+
+            guard !startedFetch else { return pricing }
+
+            let lateResolvedModels = reconcileResolvedModels(in: pricing)
+            if !lateResolvedModels.isEmpty {
+                await onLateModelsResolved?(lateResolvedModels)
+            }
+
+            return pricing
         }
         
         // No fetch available or in cooldown
@@ -82,6 +86,18 @@ actor UnknownModelFetchCoordinator {
     func timeUntilNextFetch() -> TimeInterval {
         let timeSinceLastFetch = Date().timeIntervalSince(lastFetchAttempt)
         return max(0, fastRefreshInterval - timeSinceLastFetch)
+    }
+
+    /// Reconcile externally fetched pricing with models waiting for resolution.
+    func reconcileResolvedModels(in pricing: ModelPricing) -> Set<String> {
+        let resolvedModels = pendingUnknownModels.intersection(Set(pricing.models.keys))
+        pendingUnknownModels.subtract(resolvedModels)
+
+        if !resolvedModels.isEmpty {
+            Logger.calculator.info("✅ Resolved pricing for \(resolvedModels.count) unknown model(s)")
+        }
+
+        return resolvedModels
     }
     
     /// Clear a model from pending if it was resolved externally
@@ -262,6 +278,9 @@ final class PricingManager: @unchecked Sendable {
                 }, onFetchCompleted: { [weak self] pricing, resolvedModels in
                     guard let self = self else { return }
                     await self.applyFetchedPricing(pricing, resolvedModels: resolvedModels)
+                }, onLateModelsResolved: { [weak self] resolvedModels in
+                    guard let self = self else { return }
+                    await self.applyLateResolvedModels(resolvedModels)
                 })
 
                 if fetchedPricing?.models[modelName] != nil {
@@ -443,6 +462,7 @@ final class PricingManager: @unchecked Sendable {
     @objc private func refreshPricing() async {
         do {
             let pricing = try await fetchPricingFromAPI()
+            let resolvedModels = await unknownModelCoordinator.reconcileResolvedModels(in: pricing)
             cachePricing(pricing)
             dataStore.saveModelPricing(pricing)
             dataSource = .api
@@ -450,6 +470,8 @@ final class PricingManager: @unchecked Sendable {
             
             // Notify the UI to refresh
             NotificationCenter.default.post(name: .pricingDataUpdated, object: nil)
+
+            await applyResolvedModels(resolvedModels)
         } catch {
             Logger.calculator.warning("⚠️ Scheduled pricing fetch failed: \(error.localizedDescription)")
         }
@@ -466,6 +488,17 @@ final class PricingManager: @unchecked Sendable {
 
         NotificationCenter.default.post(name: .pricingDataUpdated, object: nil)
         await scheduleRefreshIfNeeded()
+    }
+
+    private func applyLateResolvedModels(_ resolvedModels: Set<String>) async {
+        await applyResolvedModels(resolvedModels)
+        await scheduleRefreshIfNeeded()
+    }
+
+    private func applyResolvedModels(_ resolvedModels: Set<String>) async {
+        for modelName in resolvedModels {
+            await recalculateCostsForModel(modelName)
+        }
     }
     
     
