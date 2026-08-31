@@ -19,14 +19,6 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         return ModelPricing(models: modelPrices)
     }
     
-    /// Mock fetcher that succeeds after a delay
-    private func successfulFetcher(withModels models: [String], delay: TimeInterval = 0.1) -> () async throws -> ModelPricing {
-        return {
-            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            return self.mockPricing(withModels: models)
-        }
-    }
-    
     /// Mock fetcher that always fails
     private func failingFetcher() -> () async throws -> ModelPricing {
         return {
@@ -158,12 +150,19 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
 
     /// Test that requests for different unknown models still use a single fetch
     func testMultipleDifferentUnknownModels() async {
-        let coordinator = UnknownModelFetchCoordinator()
+        let requestsRegistered = expectation(description: "all requests are registered")
+        requestsRegistered.expectedFulfillmentCount = 3
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
+            requestsRegistered.fulfill()
+        })
         let fetchCallCount = Atomic<Int>(0)
-        
+        let fetchStarted = AsyncGate()
+        let releaseFetch = AsyncGate()
+
         let fetcher: () async throws -> ModelPricing = {
             fetchCallCount.increment()
-            try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            await fetchStarted.open()
+            await releaseFetch.wait()
             return self.mockPricing(withModels: ["model-1", "model-2", "model-3"])
         }
         
@@ -171,7 +170,11 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         async let result1 = coordinator.requestPricingForUnknownModel("model-1", fetcher: fetcher)
         async let result2 = coordinator.requestPricingForUnknownModel("model-2", fetcher: fetcher)
         async let result3 = coordinator.requestPricingForUnknownModel("model-3", fetcher: fetcher)
-        
+
+        await fetchStarted.wait()
+        await fulfillment(of: [requestsRegistered], timeout: 1)
+        await releaseFetch.open()
+
         let results = await [result1, result2, result3]
         
         // All should get results
@@ -187,9 +190,10 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         XCTAssertFalse(hasPending, "Should have no pending models after successful fetch")
     }
 
-    /// Test that pricing fetched outside the coordinator clears resolved pending models.
-    func testExternallyFetchedPricingReconcilesPendingModels() async {
-        let coordinator = UnknownModelFetchCoordinator()
+    /// Test that a shared refresh reconciles models waiting for resolution.
+    func testSharedRefreshReconcilesPendingModels() async {
+        let time = Atomic(Date(timeIntervalSince1970: 1_000))
+        let coordinator = UnknownModelFetchCoordinator(now: { time.value })
         let fetcher: () async throws -> ModelPricing = {
             self.mockPricing(withModels: [])
         }
@@ -197,13 +201,108 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         let result = await coordinator.requestPricingForUnknownModel("model-from-scheduled-refresh", fetcher: fetcher)
         XCTAssertNotNil(result)
 
-        let resolvedModels = await coordinator.reconcileResolvedModels(
-            in: mockPricing(withModels: ["model-from-scheduled-refresh"])
+        time.set(Date(timeIntervalSince1970: 1_060))
+        let refreshedPricing = await coordinator.refreshPricing(
+            fetcher: { self.mockPricing(withModels: ["model-from-scheduled-refresh"]) }
         )
 
-        XCTAssertEqual(resolvedModels, ["model-from-scheduled-refresh"])
+        XCTAssertNotNil(refreshedPricing)
         let hasPending = await coordinator.hasPendingModels()
         XCTAssertFalse(hasPending)
+    }
+
+    /// Test that manual and scheduled refreshes share an in-flight unknown-model fetch.
+    func testRefreshJoinsInFlightUnknownModelFetch() async {
+        let requestsRegistered = expectation(description: "both refresh requests are registered")
+        requestsRegistered.expectedFulfillmentCount = 2
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
+            requestsRegistered.fulfill()
+        })
+        let unknownFetchStarted = AsyncGate()
+        let releaseUnknownFetch = AsyncGate()
+        let unknownFetchCount = Atomic<Int>(0)
+        let refreshFetchCount = Atomic<Int>(0)
+        let completionCount = Atomic<Int>(0)
+
+        let unknownRequest = Task {
+            await coordinator.requestPricingForUnknownModel(
+                "model-a",
+                fetcher: {
+                    unknownFetchCount.increment()
+                    await unknownFetchStarted.open()
+                    await releaseUnknownFetch.wait()
+                    return self.mockPricing(withModels: ["model-a"])
+                },
+                onFetchCompleted: { _, _ in
+                    completionCount.increment()
+                }
+            )
+        }
+
+        await unknownFetchStarted.wait()
+
+        let refreshRequest = Task {
+            await coordinator.refreshPricing(
+                fetcher: {
+                    refreshFetchCount.increment()
+                    return self.mockPricing(withModels: ["model-a"])
+                },
+                onFetchCompleted: { _, _ in
+                    completionCount.increment()
+                }
+            )
+        }
+
+        await fulfillment(of: [requestsRegistered], timeout: 1)
+        await releaseUnknownFetch.open()
+
+        let unknownResult = await unknownRequest.value
+        let refreshResult = await refreshRequest.value
+        XCTAssertNotNil(unknownResult)
+        XCTAssertNotNil(refreshResult)
+        XCTAssertEqual(unknownFetchCount.value, 1)
+        XCTAssertEqual(refreshFetchCount.value, 0)
+        XCTAssertEqual(completionCount.value, 1)
+    }
+
+    /// Test that each successful external refresh restarts the unknown-model retry cooldown.
+    func testRefreshRestartsCooldownForUnresolvedModels() async {
+        let initialTime = Date(timeIntervalSince1970: 1_000)
+        let time = Atomic(initialTime)
+        let coordinator = UnknownModelFetchCoordinator(now: { time.value })
+        let emptyPricing: () async throws -> ModelPricing = {
+            self.mockPricing(withModels: [])
+        }
+
+        let initialResult = await coordinator.requestPricingForUnknownModel("unresolved-model", fetcher: emptyPricing)
+        XCTAssertNotNil(initialResult)
+
+        time.set(initialTime.addingTimeInterval(60))
+        let refreshedResult = await coordinator.refreshPricing(fetcher: emptyPricing)
+        XCTAssertNotNil(refreshedResult)
+
+        let timeUntilNextFetch = await coordinator.timeUntilNextFetch()
+        XCTAssertEqual(timeUntilNextFetch, 60, accuracy: 0.001)
+    }
+
+    /// Test that failed external refreshes restart the unknown-model retry cooldown.
+    func testFailedRefreshRestartsCooldownForUnresolvedModels() async {
+        let initialTime = Date(timeIntervalSince1970: 1_000)
+        let time = Atomic(initialTime)
+        let coordinator = UnknownModelFetchCoordinator(now: { time.value })
+        let emptyPricing: () async throws -> ModelPricing = {
+            self.mockPricing(withModels: [])
+        }
+
+        let initialResult = await coordinator.requestPricingForUnknownModel("unresolved-model", fetcher: emptyPricing)
+        XCTAssertNotNil(initialResult)
+
+        time.set(initialTime.addingTimeInterval(60))
+        let refreshedResult = await coordinator.refreshPricing(fetcher: failingFetcher())
+        XCTAssertNil(refreshedResult)
+
+        let timeUntilNextFetch = await coordinator.timeUntilNextFetch()
+        XCTAssertEqual(timeUntilNextFetch, 60, accuracy: 0.001)
     }
 
     /// Test that models registered before resolution are included in shared completion work.
@@ -363,7 +462,8 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     
     /// Test the 60-second cooldown between fetches
     func testCooldownBetweenFetches() async {
-        let coordinator = UnknownModelFetchCoordinator()
+        let time = Atomic(Date(timeIntervalSince1970: 1_000))
+        let coordinator = UnknownModelFetchCoordinator(now: { time.value })
         let fetchCallCount = Atomic<Int>(0)
         
         let fetcher: () async throws -> ModelPricing = {
@@ -407,16 +507,28 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     
     /// Test that resolved models are removed from pending
     func testResolvedModelsRemovedFromPending() async {
-        let coordinator = UnknownModelFetchCoordinator()
-        
-        // Request multiple models
-        let fetcher = successfulFetcher(withModels: ["model-a", "model-c"]) // Note: model-b not included
+        let requestsRegistered = expectation(description: "all requests are registered")
+        requestsRegistered.expectedFulfillmentCount = 3
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
+            requestsRegistered.fulfill()
+        })
+        let fetchStarted = AsyncGate()
+        let releaseFetch = AsyncGate()
+        let fetcher: () async throws -> ModelPricing = {
+            await fetchStarted.open()
+            await releaseFetch.wait()
+            return self.mockPricing(withModels: ["model-a", "model-c"])
+        }
         
         // Add three models to pending
         async let result1 = coordinator.requestPricingForUnknownModel("model-a", fetcher: fetcher)
         async let result2 = coordinator.requestPricingForUnknownModel("model-b", fetcher: fetcher)
         async let result3 = coordinator.requestPricingForUnknownModel("model-c", fetcher: fetcher)
-        
+
+        await fetchStarted.wait()
+        await fulfillment(of: [requestsRegistered], timeout: 1)
+        await releaseFetch.open()
+
         _ = await [result1, result2, result3]
         
         // model-b should still be pending since it wasn't in the response
@@ -478,11 +590,12 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     
     /// Test that new requests after cooldown trigger new fetch
     func testRequestAfterCooldownTriggersNewFetch() async {
-        // Note: This test would need to actually wait 60 seconds or mock time
-        // For practical testing, we'll use a modified coordinator with shorter cooldown
-        
-        // Create a custom coordinator with very short cooldown for testing
-        let coordinator = UnknownModelFetchCoordinatorWithCustomCooldown(cooldownSeconds: 0.5)
+        let initialTime = Date(timeIntervalSince1970: 1_000)
+        let time = Atomic(initialTime)
+        let coordinator = UnknownModelFetchCoordinator(
+            fastRefreshInterval: 0.5,
+            now: { time.value }
+        )
         let fetchCallCount = Atomic<Int>(0)
         
         let fetcher: () async throws -> ModelPricing = {
@@ -495,8 +608,7 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         _ = await coordinator.requestPricingForUnknownModel("test-model", fetcher: fetcher)
         XCTAssertEqual(fetchCallCount.value, 1)
         
-        // Wait for cooldown to expire
-        try? await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
+        time.set(initialTime.addingTimeInterval(0.6))
         
         // Second request after cooldown
         _ = await coordinator.requestPricingForUnknownModel("test-model", fetcher: fetcher)
@@ -557,52 +669,5 @@ extension Atomic where T == Int {
         lock.lock()
         defer { lock.unlock() }
         value_ += 1
-    }
-}
-
-/// Modified coordinator with configurable cooldown for testing
-actor UnknownModelFetchCoordinatorWithCustomCooldown {
-    private var pendingUnknownModels = Set<String>()
-    private var activeFetchTask: Task<ModelPricing?, Never>?
-    private var lastFetchAttempt: Date = .distantPast
-    private let fastRefreshInterval: TimeInterval
-    
-    init(cooldownSeconds: TimeInterval) {
-        self.fastRefreshInterval = cooldownSeconds
-    }
-    
-    func requestPricingForUnknownModel(_ modelName: String, fetcher: @escaping () async throws -> ModelPricing) async -> ModelPricing? {
-        pendingUnknownModels.insert(modelName)
-        
-        let now = Date()
-        let timeSinceLastFetch = now.timeIntervalSince(lastFetchAttempt)
-        
-        if activeFetchTask == nil && timeSinceLastFetch >= fastRefreshInterval {
-            lastFetchAttempt = now
-            
-            let fetchTask = Task<ModelPricing?, Never> {
-                do {
-                    let pricing = try await fetcher()
-                    let resolvedModels = pendingUnknownModels.intersection(Set(pricing.models.keys))
-                    pendingUnknownModels.subtract(resolvedModels)
-                    return pricing
-                } catch {
-                    return nil
-                }
-            }
-            
-            activeFetchTask = fetchTask
-            
-            Task {
-                _ = await fetchTask.value
-                self.activeFetchTask = nil
-            }
-        }
-        
-        if let fetchTask = activeFetchTask {
-            return await fetchTask.value
-        }
-        
-        return nil
     }
 }
