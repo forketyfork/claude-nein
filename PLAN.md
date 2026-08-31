@@ -172,7 +172,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
   - [x] Verify cost calculation accuracy
   - [x] Test app behavior during active Claude sessions
 - [x] Regression-test concurrent unknown-model pricing resolution
-- [x] Synchronize concurrent unknown-model regression tests with explicit registration signals
+- [x] Synchronize all unknown-model concurrency tests with explicit request-registration signals
 - [x] Polish user experience:
   - [x] Smooth animations and transitions (menu bar icon animations)
   - [x] Intuitive menu interactions

@@ -12,10 +12,10 @@ actor UnknownModelFetchCoordinator {
     private var activeFetchHasResolvedPricing = false
     private var lastFetchAttempt: Date = .distantPast
     private let fastRefreshInterval: TimeInterval = 60 // 1 minute for unknown models
-    private let onModelRegistered: (@Sendable () -> Void)?
+    private let onRequestRegistered: (@Sendable () -> Void)?
 
-    init(onModelRegistered: (@Sendable () -> Void)? = nil) {
-        self.onModelRegistered = onModelRegistered
+    init(onRequestRegistered: (@Sendable () -> Void)? = nil) {
+        self.onRequestRegistered = onRequestRegistered
     }
 
     /// Add an unknown model and get pricing if/when available
@@ -26,9 +26,8 @@ actor UnknownModelFetchCoordinator {
         onLateFetchCompleted: (@Sendable (Set<String>) async -> Void)? = nil
     ) async -> ModelPricing? {
         // Add to pending set
-        if pendingUnknownModels.insert(modelName).inserted {
-            onModelRegistered?()
-        }
+        pendingUnknownModels.insert(modelName)
+        onRequestRegistered?()
         
         // Check if we should trigger a new fetch
         let now = Date()

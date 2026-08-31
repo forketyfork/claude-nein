@@ -38,12 +38,19 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     
     /// Test that concurrent requests for the same unknown model result in a single fetch
     func testConcurrentRequestsForSameModel() async {
-        let coordinator = UnknownModelFetchCoordinator()
+        let requestsRegistered = expectation(description: "all requests are registered")
+        requestsRegistered.expectedFulfillmentCount = 3
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
+            requestsRegistered.fulfill()
+        })
         let fetchCallCount = Atomic<Int>(0)
-        
+        let fetchStarted = AsyncGate()
+        let releaseFetch = AsyncGate()
+
         let fetcher: () async throws -> ModelPricing = {
             fetchCallCount.increment()
-            try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            await fetchStarted.open()
+            await releaseFetch.wait()
             return self.mockPricing(withModels: ["claude-new-model"])
         }
         
@@ -51,7 +58,11 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         async let result1 = coordinator.requestPricingForUnknownModel("claude-new-model", fetcher: fetcher)
         async let result2 = coordinator.requestPricingForUnknownModel("claude-new-model", fetcher: fetcher)
         async let result3 = coordinator.requestPricingForUnknownModel("claude-new-model", fetcher: fetcher)
-        
+
+        await fetchStarted.wait()
+        await fulfillment(of: [requestsRegistered], timeout: 1)
+        await releaseFetch.open()
+
         let results = await [result1, result2, result3]
         
         // All should get the same result
@@ -65,13 +76,20 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
 
     /// Test that shared fetch completion work is performed once for concurrent requests.
     func testConcurrentRequestsInvokeSharedResolutionHandlerOnce() async {
-        let coordinator = UnknownModelFetchCoordinator()
+        let requestsRegistered = expectation(description: "all requests are registered")
+        requestsRegistered.expectedFulfillmentCount = 3
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
+            requestsRegistered.fulfill()
+        })
         let completionCallCount = Atomic<Int>(0)
         let resolvedModelCount = Atomic<Int>(0)
         let fetchedModelCount = Atomic<Int>(0)
+        let fetchStarted = AsyncGate()
+        let releaseFetch = AsyncGate()
 
         let fetcher: () async throws -> ModelPricing = {
-            try await Task.sleep(nanoseconds: 100_000_000)
+            await fetchStarted.open()
+            await releaseFetch.wait()
             return self.mockPricing(withModels: ["claude-new-model"])
         }
         let onFetchCompleted: @Sendable (ModelPricing, Set<String>) async -> Void = { pricing, resolvedModels in
@@ -95,6 +113,10 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
             fetcher: fetcher,
             onFetchCompleted: onFetchCompleted
         )
+
+        await fetchStarted.wait()
+        await fulfillment(of: [requestsRegistered], timeout: 1)
+        await releaseFetch.open()
 
         let results = await [result1, result2, result3]
 
@@ -188,7 +210,7 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     func testEarlyJoinerDoesNotReceiveLateCompletionCallback() async {
         let requestsRegistered = expectation(description: "both models are registered")
         requestsRegistered.expectedFulfillmentCount = 2
-        let coordinator = UnknownModelFetchCoordinator(onModelRegistered: {
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
             requestsRegistered.fulfill()
         })
         let fetchStarted = AsyncGate()
@@ -232,7 +254,7 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     func testLateJoinerReceivesResolutionCallback() async {
         let requestsRegistered = expectation(description: "both models are registered")
         requestsRegistered.expectedFulfillmentCount = 2
-        let coordinator = UnknownModelFetchCoordinator(onModelRegistered: {
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
             requestsRegistered.fulfill()
         })
         let callbackStarted = AsyncGate()
@@ -289,7 +311,7 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     func testLateUnresolvedJoinerReceivesCompletionCallback() async {
         let requestsRegistered = expectation(description: "both models are registered")
         requestsRegistered.expectedFulfillmentCount = 2
-        let coordinator = UnknownModelFetchCoordinator(onModelRegistered: {
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
             requestsRegistered.fulfill()
         })
         let callbackStarted = AsyncGate()
@@ -412,7 +434,7 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
     func testRapidSuccessiveRequests() async {
         let requestsRegistered = expectation(description: "all models are registered")
         requestsRegistered.expectedFulfillmentCount = 5
-        let coordinator = UnknownModelFetchCoordinator(onModelRegistered: {
+        let coordinator = UnknownModelFetchCoordinator(onRequestRegistered: {
             requestsRegistered.fulfill()
         })
         let fetchCallCount = Atomic<Int>(0)
