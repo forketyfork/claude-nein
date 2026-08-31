@@ -53,6 +53,7 @@ Build a macOS menu bar application that displays real-time Claude Code spending 
 - [x] Finalize fetched pricing only after dependent cost records are repriced
 - [x] Reschedule unknown-model retries when late joiners remain unresolved
 - [x] Serialize all pricing refreshes and restart the unknown-model retry cooldown per attempt
+- [x] Schedule the fast retry when a model is discovered during an existing cooldown
 - [x] Implement cost calculation logic:
   - [x] Calculate costs from token counts using model pricing
   - [x] Handle different token types (input, output, cache)

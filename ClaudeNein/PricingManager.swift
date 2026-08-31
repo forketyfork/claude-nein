@@ -37,7 +37,8 @@ actor UnknownModelFetchCoordinator {
         fetcher: @escaping () async throws -> ModelPricing,
         onFetchCompleted: (@Sendable (ModelPricing, Set<String>) async -> Void)? = nil,
         onLateFetchCompleted: (@Sendable (Set<String>) async -> Void)? = nil,
-        onFetchFailed: (@Sendable () async -> Void)? = nil
+        onFetchFailed: (@Sendable () async -> Void)? = nil,
+        onRetryRequired: (@Sendable () async -> Void)? = nil
     ) async -> ModelPricing? {
         // Add to pending set
         pendingUnknownModels.insert(modelName)
@@ -74,6 +75,7 @@ actor UnknownModelFetchCoordinator {
         }
         
         // No fetch available or in cooldown
+        await onRetryRequired?()
         return nil
     }
 
@@ -348,6 +350,9 @@ final class PricingManager: @unchecked Sendable {
                     guard let self = self else { return }
                     await self.finalizeLateFetch(resolvedModels)
                 }, onFetchFailed: { [weak self] in
+                    guard let self = self else { return }
+                    await self.scheduleRefreshIfNeeded()
+                }, onRetryRequired: { [weak self] in
                     guard let self = self else { return }
                     await self.scheduleRefreshIfNeeded()
                 })

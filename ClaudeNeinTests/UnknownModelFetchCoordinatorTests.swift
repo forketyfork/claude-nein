@@ -487,6 +487,36 @@ class UnknownModelFetchCoordinatorTests: XCTestCase {
         XCTAssertGreaterThan(timeUntilNext, 0, "Should have time remaining in cooldown")
         XCTAssertLessThanOrEqual(timeUntilNext, 60, "Cooldown should be at most 60 seconds")
     }
+
+    /// Test that a model discovered during a completed refresh's cooldown schedules a retry.
+    func testCooldownRequestSchedulesRetry() async {
+        let initialTime = Date(timeIntervalSince1970: 1_000)
+        let time = Atomic(initialTime)
+        let coordinator = UnknownModelFetchCoordinator(now: { time.value })
+        let retryScheduledCount = Atomic<Int>(0)
+        let initialRefresh = await coordinator.refreshPricing(
+            fetcher: { self.mockPricing(withModels: []) }
+        )
+        XCTAssertNotNil(initialRefresh)
+
+        time.set(initialTime.addingTimeInterval(10))
+        let unusedFetcher: () async throws -> ModelPricing = {
+            XCTFail("A refresh must not start during the cooldown")
+            return self.mockPricing(withModels: [])
+        }
+        let cooldownRequest = await coordinator.requestPricingForUnknownModel(
+            "model-discovered-during-cooldown",
+            fetcher: unusedFetcher,
+            onRetryRequired: {
+                retryScheduledCount.increment()
+            }
+        )
+
+        XCTAssertNil(cooldownRequest)
+        XCTAssertEqual(retryScheduledCount.value, 1)
+        let timeUntilNextFetch = await coordinator.timeUntilNextFetch()
+        XCTAssertEqual(timeUntilNextFetch, 50, accuracy: 0.001)
+    }
     
     /// Test that failed fetches don't clear pending models
     func testFailedFetchKeepsPendingModels() async {
